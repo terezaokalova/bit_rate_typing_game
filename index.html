@@ -1,0 +1,3512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bit Rate Game</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #1a1a2e;
+    color: #eee;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    user-select: none;
+  }
+
+  .screen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+  }
+  .screen.active { display: flex; }
+
+  /* ── Welcome screen ── */
+  #welcome-screen { gap: 32px; }
+  #welcome-screen h1 {
+    font-size: 42px; font-weight: 800;
+    letter-spacing: 0.06em; color: #fff;
+  }
+  #welcome-screen .subtitle {
+    font-size: 18px; color: #aaa;
+    max-width: 440px; text-align: center; line-height: 1.5;
+  }
+
+  .keycap-row {
+    display: flex; flex-wrap: wrap;
+    justify-content: center; gap: 4px;
+  }
+  .keycap {
+    width: 40px; height: 44px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px;
+    font-family: 'SF Mono','Fira Code','Cascadia Code','Consolas',monospace;
+    font-size: 16px; color: #ddd;
+    box-shadow: 0 2px 0 rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06);
+  }
+  .keycap-space {
+    min-width: 72px;
+    font-size: 13px;
+    letter-spacing: 0.02em;
+  }
+  .press-enter {
+    font-size: 18px; color: #888;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  .meta-info { font-size: 14px; color: #555; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+  }
+
+  /* ── Name screen ── */
+  #participant-screen { gap: 24px; }
+  #participant-screen h1 { font-size: 32px; font-weight: 700; }
+  #participant-input {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 8px; padding: 12px 20px;
+    font-size: 20px; color: #fff;
+    text-align: center; outline: none; width: 280px;
+    font-family: inherit;
+  }
+  #participant-input:focus { border-color: rgba(255,255,255,0.4); }
+  #participant-input::placeholder { color: #555; }
+
+  /* ── Countdown screen ── */
+  #countdown-screen { justify-content: center; }
+  #countdown-char {
+    font-size: 140px; font-weight: 800; color: #fff;
+    animation: fade-in 0.3s ease-out;
+  }
+  @keyframes fade-in {
+    from { opacity: 0; transform: scale(0.8); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  /* ── Game screen ── */
+  #game-screen { gap: 24px; }
+  #round-indicator {
+    font-size: 15px; color: #888;
+    font-variant-numeric: tabular-nums;
+    display: none;
+  }
+  #timer {
+    font-size: 28px; font-variant-numeric: tabular-nums;
+    color: #aaa; letter-spacing: 0.04em;
+  }
+  #target-area {
+    display: flex; align-items: center; min-height: 160px;
+  }
+  #target-wrapper { position: relative; display: inline-flex; align-items: center; }
+  #resync-overlay {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 36px; font-weight: 700; color: #f1c40f;
+    opacity: 0; pointer-events: none;
+  }
+  #resync-overlay.active { animation: resync-fade 500ms forwards; }
+  #target-current.pulse { animation: target-pulse 300ms; }
+  #target-current {
+    font-family: 'SF Mono','Fira Code','Cascadia Code','Consolas',monospace;
+    font-size: 96px; font-weight: 700; color: #fff;
+    line-height: 1; padding: 0; border-radius: 16px;
+    background: rgba(255,255,255,0.06);
+    border: 2px solid rgba(255,255,255,0.1);
+    border-bottom: 3px solid #3498db;
+    width: 160px; min-width: 160px; max-width: 160px;
+    height: 160px; min-height: 160px; max-height: 160px;
+    box-sizing: border-box;
+    display: flex; align-items: center; justify-content: center;
+    text-align: center; overflow: hidden;
+    transition: background-color 200ms ease-out, border-color 100ms ease-out;
+  }
+  #target-current.flash-correct { background-color: rgba(46,204,113,0.3); }
+  #target-current.flash-incorrect { background-color: rgba(231,76,60,0.3); }
+  #target-current.flash-invalid { border-color: rgba(255,255,255,0.25); }
+
+  .lookahead-item {
+    font-family: 'SF Mono','Fira Code','Cascadia Code','Consolas',monospace;
+    color: #fff; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .lookahead-1 { font-size: 48px; opacity: 0.45; margin-left: 32px; min-width: 70px; text-align: center; line-height: 1; }
+  .lookahead-2 { font-size: 36px; opacity: 0.3; margin-left: 24px; min-width: 56px; text-align: center; line-height: 1; }
+  .lookahead-3 { font-size: 28px; opacity: 0.18; margin-left: 24px; min-width: 44px; text-align: center; line-height: 1; }
+  .lookahead-4 { font-size: 22px; opacity: 0.12; margin-left: 24px; min-width: 38px; text-align: center; line-height: 1; }
+
+  #stats {
+    display: flex; gap: 40px; font-size: 22px;
+    font-variant-numeric: tabular-nums;
+  }
+  #stats span { color: #ccc; }
+  #stats .value { color: #fff; font-weight: 600; }
+  #secondary-stats {
+    display: flex; gap: 32px; font-size: 15px;
+    color: #666; font-variant-numeric: tabular-nums;
+  }
+  #streak { transition: color 0.2s; }
+  #streak.gold { color: #f1c40f; }
+  #streak.glow { color: #f1c40f; text-shadow: 0 0 12px rgba(241,196,15,0.4); }
+
+  /* ── Collect rest screen ── */
+  #collect-rest-screen { gap: 16px; justify-content: center; }
+  #rest-title { font-size: 28px; font-weight: 600; }
+  #rest-next { font-size: 20px; color: #aaa; }
+  #rest-countdown { font-size: 64px; font-weight: 700; margin-top: 16px; }
+
+  /* ── Results screens ── */
+  #results-screen, #collect-results-screen {
+    gap: 16px; max-width: 800px; padding: 40px 20px;
+  }
+  #results-screen h1, #collect-results-screen h1 {
+    font-size: 36px; font-weight: 700; margin-bottom: 8px;
+  }
+  .result-row {
+    display: flex; justify-content: space-between; width: 100%;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    font-size: 18px;
+  }
+  .result-row .label { color: #999; }
+  .result-row .value { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .result-primary {
+    font-size: 56px; font-weight: 700; color: #fff; margin: 8px 0;
+  }
+  .result-unit { font-size: 22px; color: #888; font-weight: 400; }
+
+  /* ── Export buttons ── */
+  .export-buttons {
+    display: flex; gap: 12px; margin-top: 16px;
+  }
+  .export-btn {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px; padding: 12px 24px;
+    font-size: 16px; color: #eee; cursor: pointer;
+    font-family: inherit; transition: background 0.15s;
+  }
+  .export-btn:hover { background: rgba(255,255,255,0.12); }
+
+  /* ── Analytics charts ── */
+  .analytics-container {
+    display: flex; flex-wrap: wrap;
+    justify-content: center; gap: 20px;
+    width: 100%; margin-top: 16px;
+  }
+  .chart-card {
+    background: rgba(255,255,255,0.03);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .chart-title {
+    font-size: 14px; color: #888;
+    margin-bottom: 4px; text-align: center;
+  }
+
+  /* ── Collect round table ── */
+  .round-table {
+    width: 100%; border-collapse: collapse;
+    font-size: 14px; margin: 8px 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .round-table th {
+    color: #888; font-weight: 500; padding: 6px 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.12);
+    text-align: right;
+  }
+  .round-table th:first-child { text-align: left; }
+  .round-table td {
+    padding: 6px 8px; text-align: right;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .round-table td:first-child { text-align: left; color: #aaa; }
+  .round-table .best-row td { color: #f1c40f; }
+
+  /* ── Audio toggle ── */
+  #audio-toggle {
+    position: fixed; top: 16px; right: 16px;
+    width: 32px; height: 32px;
+    background: none; border: none; cursor: pointer;
+    padding: 4px; z-index: 100;
+  }
+  #audio-toggle svg {
+    width: 24px; height: 24px;
+    fill: rgba(255,255,255,0.3);
+    transition: fill 0.15s;
+  }
+  #audio-toggle:hover svg { fill: rgba(255,255,255,0.6); }
+
+  /* ── Calibration screens ── */
+  #calib-intro-screen { gap: 32px; }
+  #calib-intro-screen h1 { font-size: 36px; font-weight: 700; }
+
+  #calib-rest-screen { gap: 12px; justify-content: center; }
+  #calib-rest-title { font-size: 24px; font-weight: 600; }
+  #calib-rest-stats { font-size: 16px; color: #aaa; font-variant-numeric: tabular-nums; }
+  #calib-rest-next { font-size: 18px; color: #888; }
+  #calib-rest-cd { font-size: 48px; font-weight: 700; margin-top: 8px; }
+
+  #calib-recommend-screen {
+    gap: 12px; max-width: 480px; padding: 24px 0;
+  }
+  #calib-recommend-screen h1 { font-size: 32px; font-weight: 700; margin-bottom: 4px; }
+  #calib-rec-n { font-size: 48px; font-weight: 700; margin: 4px 0; }
+  #calib-fit-params { line-height: 1.6; text-align: center; }
+
+  #calib-slider-container {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 4px;
+    width: 100%; margin: 8px 0;
+  }
+  #calib-slider-label {
+    font-size: 22px; font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  #calib-slider {
+    -webkit-appearance: none; appearance: none;
+    width: 300px; height: 6px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 3px; outline: none;
+  }
+  #calib-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: #fff; cursor: pointer;
+  }
+  #calib-slider::-moz-range-thumb {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: #fff; cursor: pointer; border: none;
+  }
+  #calib-slider-br { font-variant-numeric: tabular-nums; }
+  .calib-start-btn {
+    padding: 14px 36px !important;
+    font-size: 18px !important;
+    font-weight: 600 !important;
+  }
+  .calib-start-btn:hover { background: rgba(255,255,255,0.12) !important; }
+
+  /* ── Keyboard position diagram ── */
+  #kb-diagram {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    margin-top: 16px;
+  }
+  .kb-row {
+    display: flex;
+    gap: 4px;
+  }
+  .kb-row-1 { margin-left: 0; }
+  .kb-row-2 { margin-left: 17px; }
+  .kb-row-3 { margin-left: 34px; }
+  .kb-row-space { margin-left: 0; justify-content: center; }
+  .kb-key-space { width: 160px; }
+  .kb-key {
+    width: 38px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 4px;
+    font-family: 'SF Mono','Fira Code','Cascadia Code','Consolas',monospace;
+    font-size: 15px;
+    color: rgba(255,255,255,0.5);
+    background: rgba(255,255,255,0.06);
+    transition: background-color 80ms ease-out, color 80ms ease-out;
+  }
+  .kb-key.kb-inactive {
+    background: transparent;
+    color: rgba(255,255,255,0.1);
+    border-color: rgba(255,255,255,0.04);
+  }
+  .kb-key.kb-target {
+    background: #3498db;
+    color: #fff;
+    border-color: #3498db;
+    box-shadow: 0 0 8px rgba(52,152,219,0.5);
+  }
+  .kb-key.kb-next {
+    background: rgba(52,152,219,0.25);
+    color: rgba(255,255,255,0.7);
+    border-color: rgba(52,152,219,0.4);
+  }
+
+  @keyframes resync-fade {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+  @keyframes target-pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+    100% { transform: scale(1); }
+  }
+  @keyframes streak-pop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.4); }
+    100% { transform: scale(1); }
+  }
+  @keyframes confetti-fall {
+    0% { transform: translateY(0) translateX(0) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(100vh) translateX(var(--drift)) rotate(var(--rotation)); opacity: 0; }
+  }
+  @keyframes streak-burst {
+    0% { opacity: 1; transform: scale(0.5); }
+    100% { opacity: 0; transform: scale(2.5); }
+  }
+  #streak.milestone { animation: streak-pop 300ms ease-out; }
+
+  .welcome-instruction { font-size: 16px; color: #aaa; max-width: 400px; text-align: center; }
+
+  .settings-row {
+    display: flex; gap: 24px; align-items: center;
+    justify-content: center;
+  }
+  .setting-group { display: flex; align-items: center; gap: 8px; }
+  .setting-label { font-size: 13px; color: #888; cursor: pointer; }
+  .setting-checkbox { display: none; }
+  .setting-cb-box {
+    width: 16px; height: 16px; border-radius: 4px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.2);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex-shrink: 0;
+  }
+  .setting-checkbox:checked + .setting-cb-box {
+    background: rgba(52,152,219,0.3); border-color: #3498db;
+  }
+  .setting-checkbox:checked + .setting-cb-box::after {
+    content: '\2713'; color: #fff; font-size: 11px;
+  }
+  .n-slider-group { display: none; align-items: center; gap: 8px; }
+  .n-slider-group.visible { display: flex; }
+  .n-slider {
+    -webkit-appearance: none; appearance: none;
+    width: 100px; height: 4px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 2px; outline: none;
+  }
+  .n-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: #fff; cursor: pointer;
+  }
+  .n-slider::-moz-range-thumb {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: #fff; cursor: pointer; border: none;
+  }
+  .n-slider-value {
+    font-size: 13px; color: #aaa; font-variant-numeric: tabular-nums;
+    min-width: 44px;
+  }
+  .duration-btn {
+    padding: 4px 10px; font-size: 13px; color: #888;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 4px; cursor: pointer;
+    font-family: inherit; transition: background 0.15s;
+  }
+  .duration-btn:hover { background: rgba(255,255,255,0.08); }
+  .duration-btn.active {
+    background: rgba(255,255,255,0.15);
+    color: #eee; border-color: rgba(255,255,255,0.25);
+  }
+  /* ── Chord mode ── */
+  #chord-welcome-screen { gap: 24px; max-width: 600px; }
+  #chord-game-screen { gap: 16px; }
+  #chord-results-screen { gap: 4px; max-width: 480px; }
+  .chord-pattern { display: flex; align-items: center; gap: 3px; justify-content: center; }
+  .chord-hand-gap { width: 12px; }
+  .chord-dot {
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.2);
+    background: transparent;
+  }
+  .chord-dot.active { background: #3498db; border-color: #3498db; }
+  .chord-label {
+    font-family: "SF Mono","Fira Code","Cascadia Code","Consolas",monospace;
+    text-align: center; color: #aaa;
+  }
+  .chord-target-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .chord-lookahead-row { display: flex; gap: 24px; align-items: center; }
+  .chord-legend {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 8px; width: 100%;
+  }
+  .chord-legend-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .chord-legend-title { font-size: 13px; color: #666; margin-bottom: 4px; grid-column: span 4; }
+</style>
+</head>
+<body>
+
+<button id="audio-toggle" title="Toggle audio">
+  <svg id="audio-icon-on" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0012 7.5v2a2.5 2.5 0 010 5v2A4.5 4.5 0 0016.5 12zM12 3.2v2a6.5 6.5 0 010 13.6v2a8.5 8.5 0 000-17.6z"/>
+  </svg>
+  <svg id="audio-icon-off" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="display:none">
+    <path d="M3 9v6h4l5 5V4L7 9H3zm13.6-1.4l-1.4 1.4L17.2 12l-2 2 1.4 1.4 2-2 2 2 1.4-1.4-2-2 2-2-1.4-1.4-2 2-2-2z"/>
+  </svg>
+</button>
+
+<div id="participant-screen" class="screen">
+  <h1>Data Collection Mode</h1>
+  <div class="subtitle">Enter name to begin</div>
+  <input type="text" id="name-input" placeholder="Name" autocomplete="off" spellcheck="false">
+  <button class="export-btn" id="participant-start">Start</button>
+</div>
+
+<div id="welcome-screen" class="screen">
+  <h1>BIT RATE CHALLENGE</h1>
+  <div class="subtitle">Type the target key as fast and accurately as you can</div>
+  <div class="welcome-instruction">Press the key matching the large letter above. Speed and accuracy both count.</div>
+  <div class="settings-row" id="settings-row">
+    <div class="setting-group">
+      <input type="checkbox" id="skip-calib-check" class="setting-checkbox">
+      <label for="skip-calib-check" class="setting-cb-box"></label>
+      <label for="skip-calib-check" class="setting-label">Skip calibration</label>
+    </div>
+    <div class="setting-group n-slider-group" id="n-slider-group">
+      <input type="range" id="settings-n-slider" class="n-slider" min="3" max="32" step="1" value="26">
+      <span class="n-slider-value" id="settings-n-value">N = 26</span>
+    </div>
+    <div class="setting-group">
+      <span class="setting-label">Duration</span>
+      <div id="duration-buttons" style="display:flex;gap:4px;">
+        <button class="duration-btn" data-dur="15">15s</button>
+        <button class="duration-btn" data-dur="30">30s</button>
+        <button class="duration-btn active" data-dur="60">60s</button>
+      </div>
+    </div>
+  </div>
+  <div class="keycap-row" id="keycap-display"></div>
+  <div class="press-enter">Press Enter to start</div>
+  <div class="meta-info" id="spatial-audio-note"></div>
+  <div class="meta-info" id="welcome-meta"></div>
+</div>
+
+<div id="calib-intro-screen" class="screen">
+  <h1>Calibration</h1>
+  <div class="subtitle">You'll play 3 short rounds at different alphabet sizes. This helps find your optimal setting for the scored run.</div>
+  <div class="press-enter">Press Enter to begin</div>
+</div>
+
+<div id="calib-rest-screen" class="screen">
+  <div id="calib-rest-title"></div>
+  <div id="calib-rest-stats" class="meta-info"></div>
+  <div id="calib-rest-next"></div>
+  <div id="calib-rest-cd"></div>
+</div>
+
+<div id="calib-recommend-screen" class="screen">
+  <h1>Your Optimal Setting</h1>
+  <div id="calib-rec-n" class="result-primary"></div>
+  <div class="meta-info" id="calib-rec-br"></div>
+  <div class="meta-info" id="calib-rec-note"></div>
+  <div id="calib-round-summary" style="width:100%"></div>
+  <div class="meta-info" id="calib-fit-params"></div>
+  <div id="calib-chart-container" class="analytics-container"></div>
+  <div class="meta-info" id="calib-chart-note" style="font-size:12px;color:#888"></div>
+  <div class="keycap-row" id="calib-keycap-display" style="margin:8px 0"></div>
+  <div class="meta-info" id="calib-excluded" style="font-size:12px;color:#666"></div>
+  <div id="calib-edge-tradeoffs"></div>
+  <div id="calib-slider-container">
+    <div id="calib-slider-label">N = 10</div>
+    <input type="range" id="calib-slider" min="3" max="32" step="1" value="10">
+    <div class="meta-info" id="calib-slider-br"></div>
+  </div>
+  <button class="export-btn calib-start-btn" id="calib-start-btn">Start Scored Run (60s)</button>
+  <div class="press-enter">or press Enter</div>
+</div>
+
+<div id="countdown-screen" class="screen">
+  <div id="countdown-char">3</div>
+</div>
+
+<div id="game-screen" class="screen">
+  <div id="round-indicator"></div>
+  <div id="timer">60.0</div>
+  <div id="target-area">
+    <div id="target-wrapper">
+      <div id="target-current">&mdash;</div>
+      <div id="resync-overlay"></div>
+    </div>
+    <div class="lookahead-item lookahead-1" id="look-1"></div>
+    <div class="lookahead-item lookahead-2" id="look-2"></div>
+    <div class="lookahead-item lookahead-3" id="look-3"></div>
+    <div class="lookahead-item lookahead-4" id="look-4"></div>
+  </div>
+  <div id="stats">
+    <span>Bit rate: <span class="value" id="bitrate-display">0.00 bits/s</span></span>
+    <span>Accuracy: <span class="value" id="accuracy-display">&mdash;</span></span>
+  </div>
+  <div id="secondary-stats">
+    <span id="counts">Sc: 0 &nbsp; Si: 0</span>
+    <span id="streak">Streak: 0</span>
+  </div>
+  <div id="momentum-bar" style="width:200px;height:4px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden;margin-top:8px;">
+    <div id="momentum-fill" style="width:0%;height:100%;background:#3498db;border-radius:2px;transition:width 150ms ease-out;"></div>
+  </div>
+  <div id="kb-diagram">
+    <div class="kb-row kb-row-1" id="kb-row-1"></div>
+    <div class="kb-row kb-row-2" id="kb-row-2"></div>
+    <div class="kb-row kb-row-3" id="kb-row-3"></div>
+    <div class="kb-row kb-row-space" id="kb-row-space"></div>
+  </div>
+</div>
+
+<div id="collect-rest-screen" class="screen">
+  <div id="rest-title"></div>
+  <div id="rest-next"></div>
+  <div id="rest-countdown"></div>
+</div>
+
+<div id="results-screen" class="screen">
+  <h1>Results</h1>
+  <div class="result-primary" id="result-bitrate">0.00 <span class="result-unit">bits/s</span></div>
+  <div class="result-row"><span class="label">Alphabet size (N)</span><span class="value" id="result-n"></span></div>
+  <div class="result-row"><span class="label">Correct (Sc)</span><span class="value" id="result-sc"></span></div>
+  <div class="result-row"><span class="label">Incorrect (Si)</span><span class="value" id="result-si"></span></div>
+  <div class="result-row"><span class="label">Total selections</span><span class="value" id="result-total"></span></div>
+  <div class="result-row"><span class="label">Accuracy</span><span class="value" id="result-accuracy"></span></div>
+  <div class="result-row"><span class="label">Duration</span><span class="value" id="result-duration"></span></div>
+  <div class="result-row"><span class="label">Shenoy efficiency</span><span class="value" id="result-efficiency"></span></div>
+  <div id="analytics-container" class="analytics-container"></div>
+  <div id="error-patterns"></div>
+  <div class="export-buttons">
+    <button class="export-btn" id="btn-copy-json">Copy JSON</button>
+    <button class="export-btn" id="btn-download-json">Download JSON</button>
+  </div>
+  <div class="press-enter">Press Enter to play again</div>
+</div>
+
+<div id="collect-results-screen" class="screen">
+  <h1>Collection Complete</h1>
+  <div class="result-primary" id="collect-best-br"></div>
+  <div class="meta-info" id="collect-best-info"></div>
+  <div id="collect-round-rows"></div>
+  <div id="collect-analytics" class="analytics-container"></div>
+  <div id="collect-error-patterns"></div>
+  <div class="export-buttons">
+    <button class="export-btn" id="btn-collect-copy">Copy JSON</button>
+    <button class="export-btn" id="btn-collect-download">Download JSON</button>
+  </div>
+  <div class="press-enter">Press Enter to restart</div>
+</div>
+
+<div id="chord-welcome-screen" class="screen">
+  <h1>CHORD MODE</h1>
+  <div class="subtitle">Press single keys or simultaneous same-hand pairs</div>
+  <div id="chord-legend" class="chord-legend"></div>
+  <div class="meta-info">20 symbols at 4.25 bits/selection. Break-even vs 26-letter mode requires chord RT &lt; single-key RT &times; 0.91.</div>
+  <div class="press-enter">Press Enter to start</div>
+</div>
+
+<div id="chord-game-screen" class="screen">
+  <div id="chord-timer" style="font-size:28px;font-variant-numeric:tabular-nums;color:#888;">60.0</div>
+  <div id="chord-target" class="chord-target-wrap"></div>
+  <div id="chord-lookahead" class="chord-lookahead-row">
+    <div class="chord-target-wrap" id="chord-look-1"></div>
+    <div class="chord-target-wrap" id="chord-look-2"></div>
+    <div class="chord-target-wrap" id="chord-look-3"></div>
+  </div>
+  <div id="chord-stats" style="display:flex;gap:24px;">
+    <span>Bit rate: <span class="value" id="chord-bitrate">0.00 bits/s</span></span>
+    <span>Accuracy: <span class="value" id="chord-accuracy">&mdash;</span></span>
+  </div>
+  <div id="chord-secondary-stats" style="display:flex;gap:24px;font-size:13px;color:#aaa;">
+    <span id="chord-counts">Sc: 0 &nbsp; Si: 0</span>
+    <span id="chord-streak">Streak: 0</span>
+  </div>
+</div>
+
+<div id="chord-results-screen" class="screen">
+  <h1>Chord Results</h1>
+  <div class="result-primary" id="chord-result-bitrate">0.00 <span class="result-unit">bits/s</span></div>
+  <div class="result-row"><span class="label">Alphabet size (N)</span><span class="value" id="chord-result-n">20</span></div>
+  <div class="result-row"><span class="label">Correct (Sc)</span><span class="value" id="chord-result-sc"></span></div>
+  <div class="result-row"><span class="label">Incorrect (Si)</span><span class="value" id="chord-result-si"></span></div>
+  <div class="result-row"><span class="label">Total selections</span><span class="value" id="chord-result-total"></span></div>
+  <div class="result-row"><span class="label">Accuracy</span><span class="value" id="chord-result-accuracy"></span></div>
+  <div class="result-row"><span class="label">Duration</span><span class="value" id="chord-result-duration"></span></div>
+  <div class="result-row"><span class="label">Shenoy efficiency</span><span class="value" id="chord-result-efficiency"></span></div>
+  <div id="chord-analytics" class="analytics-container"></div>
+  <div class="export-buttons">
+    <button class="export-btn" id="btn-chord-copy">Copy JSON</button>
+    <button class="export-btn" id="btn-chord-download">Download JSON</button>
+  </div>
+  <div class="press-enter">Press Enter to play again</div>
+</div>
+
+<script>
+'use strict';
+
+// ─────────────────────────────────────────────────────────────────────
+// Mode detection
+// ─────────────────────────────────────────────────────────────────────
+const _params = new URLSearchParams(window.location.search);
+const IS_COLLECT = _params.get('mode') === 'collect';
+const MANUAL_N = !IS_COLLECT && _params.has('n') ? Math.min(32, Math.max(3, parseInt(_params.get('n')) || 10)) : null;
+const IS_CHORD = !IS_COLLECT && _params.get('mode') === 'chord';
+const CUSTOM_DURATION = _params.has('duration') ? Math.min(120, Math.max(5, parseInt(_params.get('duration')) || 60)) : null;
+const COLLECT_N_VALUES = [6, 10, 14, 18, 24, 30];
+const COLLECT_DURATION_S = 30;
+const COLLECT_REST_S = 5;
+
+// ─────────────────────────────────────────────────────────────────────
+// KeySubsetSelector — letters + special keys, center-outward priority
+// ─────────────────────────────────────────────────────────────────────
+const KeySubsetSelector = (() => {
+  const PRIORITY = [
+    'A','S','D','F','J','K','L',';',
+    'SPACE',
+    'G','H',
+    'E','I','R','U','T','Y','W','O',
+    'V','N','C','M','X',
+    'P','B',
+    'Q','Z',"'",'/',',','.',
+  ];
+  const LAYOUT_ORDER = [
+    'Q','W','E','R','T','Y','U','I','O','P',
+    'A','S','D','F','G','H','J','K','L',';',"'",
+    'Z','X','C','V','B','N','M',',','.','/','SPACE',
+  ];
+  const layoutIndex = new Map();
+  LAYOUT_ORDER.forEach((k, i) => layoutIndex.set(k, i));
+
+  function getKeySubset(n) {
+    const sel = PRIORITY.slice(0, n);
+    sel.sort((a, b) => layoutIndex.get(a) - layoutIndex.get(b));
+    return sel;
+  }
+
+  function getOptimalKeySubset(n, keyStats) {
+    const statsMap = new Map();
+    keyStats.forEach(s => statsMap.set(s.key, s));
+    // Score each key: use composite_score if enough data, else priority rank
+    const scored = PRIORITY.map((key, idx) => {
+      const s = statsMap.get(key);
+      const score = (s && s.attempts >= 1) ? s.composite_score : idx * 10 + 500;
+      return { key, score };
+    });
+    scored.sort((a, b) => a.score - b.score);
+    const sel = scored.slice(0, n).map(s => s.key);
+    sel.sort((a, b) => layoutIndex.get(a) - layoutIndex.get(b));
+    return sel;
+  }
+
+  return { getKeySubset, getOptimalKeySubset, PRIORITY, LAYOUT_ORDER };
+})();
+
+// ─────────────────────────────────────────────────────────────────────
+// KeyNormalizer — letters + special keys
+// ─────────────────────────────────────────────────────────────────────
+const KeyNormalizer = {
+  getKeyFromEvent(event) {
+    if (event.code === 'Space' || event.key === ' ') return 'SPACE';
+    if (event.code === 'Semicolon' || event.key === ';') return ';';
+    if (event.code === 'Quote' || event.key === "'") return "'";
+    if (event.code === 'Slash' || event.key === '/') return '/';
+    if (event.code === 'Comma' || event.key === ',') return ',';
+    if (event.code === 'Period' || event.key === '.') return '.';
+    return event.key.toUpperCase();
+  }
+};
+
+// Display mapping for special keys
+const DISPLAY_MAP = { 'SPACE': 'SPACE' };
+function displayKey(key) { return DISPLAY_MAP[key] || key; }
+function spawnConfetti(count) {
+  const colors = ['#f1c40f', '#e74c3c', '#2ecc71', '#3498db', '#9b59b6', '#e67e22'];
+  for (let i = 0; i < count; i++) {
+    const particle = document.createElement('div');
+    const size = Math.random() * 8 + 4;
+    const x = Math.random() * 100;
+    const drift = (Math.random() - 0.5) * 200;
+    const duration = Math.random() * 2 + 2;
+    const delay = Math.random() * 0.5;
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    const rotation = Math.random() * 720 - 360;
+    particle.style.cssText =
+      'position:fixed;top:-10px;left:' + x + '%;width:' + size + 'px;height:' + (size * 0.6) +
+      'px;background:' + color + ';pointer-events:none;z-index:9999;border-radius:1px;' +
+      'animation:confetti-fall ' + duration + 's ease-in ' + delay + 's forwards;' +
+      '--drift:' + drift + 'px;--rotation:' + rotation + 'deg;';
+    document.body.appendChild(particle);
+    setTimeout(() => particle.remove(), (duration + delay) * 1000 + 100);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// BitRateCalculator — Shenoy formula
+// ─────────────────────────────────────────────────────────────────────
+const BitRateCalculator = {
+  compute(n, sc, si, tElapsedSeconds) {
+    if (tElapsedSeconds < 0.001 || sc - si <= 0) return 0;
+    return Math.log2(n - 1) * (sc - si) / tElapsedSeconds;
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────
+// InfoTheory — mutual information and channel capacity analysis
+// ─────────────────────────────────────────────────────────────────────
+const InfoTheory = (() => {
+  // Compute mutual information I(X;Y) from trial data
+  // X = targets, Y = responses
+  function computeMI(trials, alphabet) {
+    const N = alphabet.length;
+    if (trials.length === 0 || N < 2) return { mi: 0, confusion: [], alphabetUsed: [] };
+
+    const keyToIdx = new Map();
+    alphabet.forEach((k, i) => keyToIdx.set(k, i));
+
+    // Build confusion matrix (counts)
+    const counts = Array.from({ length: N }, () => new Float64Array(N));
+    let total = 0;
+    trials.forEach(t => {
+      const xi = keyToIdx.get(t.target);
+      const yi = keyToIdx.get(t.response);
+      if (xi !== undefined && yi !== undefined) {
+        counts[xi][yi]++;
+        total++;
+      }
+    });
+
+    if (total === 0) return { mi: 0, confusion: counts, alphabetUsed: alphabet };
+
+    // Joint distribution p(x, y)
+    const pJoint = counts.map(row => row.map(c => c / total));
+
+    // Marginals
+    const pX = new Float64Array(N);  // p(target)
+    const pY = new Float64Array(N);  // p(response)
+    for (let x = 0; x < N; x++) {
+      for (let y = 0; y < N; y++) {
+        pX[x] += pJoint[x][y];
+        pY[y] += pJoint[x][y];
+      }
+    }
+
+    // I(X;Y) = sum p(x,y) log2(p(x,y) / (p(x) * p(y)))
+    let mi = 0;
+    for (let x = 0; x < N; x++) {
+      for (let y = 0; y < N; y++) {
+        if (pJoint[x][y] > 0 && pX[x] > 0 && pY[y] > 0) {
+          mi += pJoint[x][y] * Math.log2(pJoint[x][y] / (pX[x] * pY[y]));
+        }
+      }
+    }
+
+    // Panzeri & Treves (1996) first-order bias correction
+    // b = (S_xy - S_x - S_y + 1) / (2 * N * ln(2))
+    const Sxy = pJoint.flat().filter(p => p > 0).length;
+    const Sx = pX.filter(p => p > 0).length;
+    const Sy = pY.filter(p => p > 0).length;
+    const bias = Math.max(0, (Sxy - Sx - Sy + 1)) / (2 * total * Math.LN2);
+    const miCorrected = Math.max(0, mi - bias);
+
+    return {
+      mi: miCorrected,
+      miUncorrected: mi,
+      bias,
+      confusion: counts,
+      alphabetUsed: alphabet,
+      pX,
+      pY,
+      total,
+    };
+  }
+
+  // Compute throughput summary
+  function throughputSummary(trials, alphabet, durationS, n, sc, si) {
+    const info = computeMI(trials, alphabet);
+    const selectionsPerSec = trials.length / durationS;
+
+    // MI-based throughput: bits of mutual information per second
+    const miThroughput = info.mi * selectionsPerSec;
+
+    // Shenoy achieved bit rate
+    const shenoyBR = Math.log2(n - 1) * Math.max(sc - si, 0) / durationS;
+
+    // Theoretical maximum: perfect accuracy at observed speed
+    const theoreticalMax = Math.log2(n - 1) * selectionsPerSec;
+
+    // Maximum possible MI per selection (log2(N) for uniform input)
+    const maxMIPerSelection = Math.log2(n);
+
+    return {
+      ...info,
+      selectionsPerSec,
+      miPerSelection: info.mi,
+      miThroughput,
+      shenoyBR,
+      theoreticalMax,
+      maxMIPerSelection,
+      shenoyEfficiency: theoreticalMax > 0 ? shenoyBR / theoreticalMax : 0,
+      miEfficiency: theoreticalMax > 0 ? miThroughput / theoreticalMax : 0,
+    };
+  }
+
+  return { computeMI, throughputSummary };
+})();
+
+// ─────────────────────────────────────────────────────────────────────
+// TrialLogger
+// ─────────────────────────────────────────────────────────────────────
+class TrialLogger {
+  constructor() { this.trials = []; }
+  log(timestampMs, target, response, correct, rtMs) {
+    this.trials.push({
+      trial_number: this.trials.length + 1,
+      timestamp_ms: timestampMs, target, response, correct, rt_ms: rtMs,
+    });
+  }
+  get length() { return this.trials.length; }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// DataExporter — copy to clipboard and download JSON
+// ─────────────────────────────────────────────────────────────────────
+const DataExporter = {
+  copyJSON(jsonStr, button) {
+    const done = () => {
+      const orig = button.textContent;
+      button.textContent = 'Copied!';
+      setTimeout(() => { button.textContent = orig; }, 1500);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(jsonStr).then(done).catch(() => {
+        this._fallbackCopy(jsonStr); done();
+      });
+    } else {
+      this._fallbackCopy(jsonStr); done();
+    }
+  },
+  _fallbackCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;left:-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  },
+  downloadJSON(data, filename) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+  makeFilename(mode, id) {
+    const d = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+    return 'bitrate_' + mode + '_' + (id || 'session') + '_' + d + '.json';
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────
+// AudioFeedback — Web Audio API tones
+// ─────────────────────────────────────────────────────────────────────
+const AudioFeedback = (() => {
+  let audioCtx = null;
+  let enabled = true;
+  const iconOn = document.getElementById('audio-icon-on');
+  const iconOff = document.getElementById('audio-icon-off');
+
+  document.getElementById('audio-toggle').addEventListener('click', () => {
+    enabled = !enabled;
+    iconOn.style.display = enabled ? '' : 'none';
+    iconOff.style.display = enabled ? 'none' : '';
+    const noteEl = document.getElementById('spatial-audio-note');
+    if (noteEl) noteEl.textContent = enabled ? 'Spatial audio cues enabled \u2014 tones indicate key position' : 'Audio muted';
+  });
+
+  function ensureContext() {
+    if (!audioCtx) {
+      try {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      } catch (e) { return null; }
+    }
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  function playTone(frequency, durationMs, gain) {
+    if (!enabled) return;
+    const ctx = ensureContext();
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = frequency;
+    g.gain.setValueAtTime(0, ctx.currentTime);
+    g.gain.linearRampToValueAtTime(gain, ctx.currentTime + 0.005);
+    g.gain.linearRampToValueAtTime(0, ctx.currentTime + durationMs / 1000);
+    osc.connect(g);
+    g.connect(ctx.destination);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + durationMs / 1000 + 0.01);
+  }
+
+  const ZONE_MAP = {};
+  ['Q','W','A','S','Z','X'].forEach(k => ZONE_MAP[k] = 260);
+  ['E','R','T','D','F','G','C','V','B','SPACE'].forEach(k => ZONE_MAP[k] = 440);
+  ['Y','U','I','O','P','H','J','K','L','N','M',';',"'",'/',',','.'].forEach(k => ZONE_MAP[k] = 740);
+
+  function spatialCue(letter) {
+    if (!enabled) return;
+    const ctx = ensureContext();
+    if (!ctx) return;
+    const freq = ZONE_MAP[letter] || 440;
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    g.gain.setValueAtTime(0, ctx.currentTime);
+    g.gain.linearRampToValueAtTime(0.10, ctx.currentTime + 0.005);
+    g.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.05);
+    osc.connect(g);
+    g.connect(ctx.destination);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.06);
+  }
+
+  return {
+    init() { ensureContext(); },
+    correct() { playTone(880, 50, 0.15); },
+    incorrect() { playTone(220, 80, 0.15); },
+    countdownTick() { playTone(440, 100, 0.1); },
+    countdownGo() { playTone(880, 150, 0.12); },
+    gameEnd() {
+      playTone(523, 80, 0.1);
+      setTimeout(() => playTone(784, 80, 0.1), 80);
+    },
+    spatialCue,
+    isEnabled() { return enabled; },
+  };
+})();
+
+// ─────────────────────────────────────────────────────────────────────
+// ChordSymbols — 20 symbols: 8 singles + 6 left pairs + 6 right pairs
+// ─────────────────────────────────────────────────────────────────────
+const ChordSymbols = (() => {
+  const LEFT = ['A','S','D','F'];
+  const RIGHT = ['J','K','L',';'];
+  const symbols = [];
+
+  // 8 singles
+  LEFT.forEach(k => symbols.push({ id: k, keys: [k], hand: 'left' }));
+  RIGHT.forEach(k => symbols.push({ id: k, keys: [k], hand: 'right' }));
+
+  // 6 left-hand pairs
+  for (let i = 0; i < LEFT.length; i++)
+    for (let j = i + 1; j < LEFT.length; j++)
+      symbols.push({ id: LEFT[i] + '+' + LEFT[j], keys: [LEFT[i], LEFT[j]], hand: 'left' });
+
+  // 6 right-hand pairs
+  for (let i = 0; i < RIGHT.length; i++)
+    for (let j = i + 1; j < RIGHT.length; j++)
+      symbols.push({ id: RIGHT[i] + '+' + RIGHT[j], keys: [RIGHT[i], RIGHT[j]], hand: 'right' });
+
+  const ALL_KEYS = new Set([...LEFT, ...RIGHT]);
+
+  function getHand(key) {
+    if (LEFT.includes(key)) return 'left';
+    if (RIGHT.includes(key)) return 'right';
+    return null;
+  }
+
+  function findSymbol(keys) {
+    const sorted = [...keys].sort();
+    return symbols.find(s => {
+      const sk = [...s.keys].sort();
+      return sk.length === sorted.length && sk.every((k, i) => k === sorted[i]);
+    }) || null;
+  }
+
+  return { symbols, LEFT, RIGHT, ALL_KEYS, getHand, findSymbol };
+})();
+
+// ─────────────────────────────────────────────────────────────────────
+// ChordDetector — resolves single keys (80ms timeout) or same-hand pairs
+// ─────────────────────────────────────────────────────────────────────
+const ChordDetector = (() => {
+  let pending = null; // { key, hand, timestamp, timeout }
+  let onResolved = null;
+
+  function init(callback) {
+    onResolved = callback;
+    pending = null;
+  }
+
+  function resolveSingle(entry) {
+    const sym = ChordSymbols.findSymbol([entry.key]);
+    if (sym && onResolved) onResolved(sym, entry.timestamp);
+  }
+
+  function handleKeyDown(event) {
+    if (event.repeat) return;
+    const raw = event.key;
+    // Normalize: semicolon stays as ';', letters uppercase
+    let key;
+    if (event.code === 'Semicolon' || raw === ';') key = ';';
+    else if (raw.length === 1) key = raw.toUpperCase();
+    else return;
+
+    if (!ChordSymbols.ALL_KEYS.has(key)) return;
+    event.preventDefault();
+
+    const hand = ChordSymbols.getHand(key);
+    const now = performance.now();
+
+    if (pending) {
+      if (pending.hand === hand && pending.key !== key) {
+        // Same hand, different key → chord
+        clearTimeout(pending.timeout);
+        const sym = ChordSymbols.findSymbol([pending.key, key]);
+        pending = null;
+        if (sym && onResolved) onResolved(sym, now);
+        return;
+      }
+      if (pending.hand !== hand) {
+        // Cross-hand: resolve pending as single, start new pending
+        clearTimeout(pending.timeout);
+        resolveSingle(pending);
+        pending = null;
+        // Fall through to start new pending below
+      }
+      if (pending && pending.key === key) {
+        // Same key repeat: ignore
+        return;
+      }
+    }
+
+    // Start new pending with 80ms window
+    const entry = { key, hand, timestamp: now, timeout: null };
+    entry.timeout = setTimeout(() => {
+      if (pending === entry) {
+        pending = null;
+        resolveSingle(entry);
+      }
+    }, 80);
+    pending = entry;
+  }
+
+  function cleanup() {
+    if (pending) {
+      clearTimeout(pending.timeout);
+      pending = null;
+    }
+    onResolved = null;
+  }
+
+  return { init, handleKeyDown, cleanup };
+})();
+
+// ─────────────────────────────────────────────────────────────────────
+// CalibrationFitter — OLS fitting + N* sweep
+// ─────────────────────────────────────────────────────────────────────
+const CalibrationFitter = (() => {
+  function fit(rounds) {
+    const xs = rounds.map(r => Math.log2(r.n));
+    const xMean = xs.reduce((s, v) => s + v, 0) / xs.length;
+    let den = 0;
+    for (let i = 0; i < xs.length; i++) den += (xs[i] - xMean) ** 2;
+
+    // Hick's law: y = 1/R (inter-selection interval) = a + b*log2(N)
+    const Rs = rounds.map(r => r.selections_per_sec);
+    const ys = Rs.map(r => r > 0 ? 1 / r : 10);
+    const yMean = ys.reduce((s, v) => s + v, 0) / ys.length;
+    let numRate = 0;
+    for (let i = 0; i < xs.length; i++) numRate += (xs[i] - xMean) * (ys[i] - yMean);
+    let b = den > 0 ? numRate / den : 0;
+    let a = yMean - b * xMean;
+    a = Math.max(0.05, Math.min(1.0, a));
+    b = Math.max(0.0, Math.min(0.5, b));
+
+    // R² for Hick's law fit
+    const ssTot = ys.reduce((s, y) => s + (y - yMean) ** 2, 0);
+    const ssRes = ys.reduce((s, y, i) => s + (y - (a + b * xs[i])) ** 2, 0);
+    const rSquared = ssTot > 0 ? 1 - ssRes / ssTot : 0;
+
+    // Accuracy model: p(N) = p0 - c * log2(N)
+    const ps = rounds.map(r => r.accuracy);
+    const pMean = ps.reduce((s, v) => s + v, 0) / ps.length;
+    let numAcc = 0;
+    for (let i = 0; i < xs.length; i++) numAcc += (xs[i] - xMean) * (ps[i] - pMean);
+    const slope = den > 0 ? numAcc / den : 0;
+    let p0, c;
+    if (slope >= 0) {
+      // Raw slope is positive (accuracy increases with N) or flat.
+      // No measurable accuracy decay. Set c=0, p0=mean accuracy.
+      // Both parameters updated together to keep the model consistent with data.
+      c = 0;
+      p0 = pMean;
+    } else {
+      // Raw slope is negative (accuracy decreases with N), the expected case.
+      c = -slope;
+      p0 = pMean - slope * xMean;
+    }
+    // Clamp p0 to [0.5, ∞). No upper clamp: p0 > 1.0 is mathematically valid
+    // (it means the model extrapolates saturated accuracy at small N).
+    p0 = Math.max(0.5, p0);
+    // Clamp c to [0, 0.15]. Upper clamp prevents wild extrapolation from noisy fits.
+    c = Math.min(0.15, c);
+
+    // Sweep N=3..31 to find N*
+    let bestN = 10, bestBR = 0;
+    const curve = [];
+    console.log('[CalibFit] Model params: a=' + a.toFixed(4) + ' b=' + b.toFixed(4) + ' p0=' + p0.toFixed(4) + ' c=' + c.toFixed(4) + ' R²=' + rSquared.toFixed(4));
+    console.log('[CalibFit] Input rounds:', JSON.stringify(rounds.map(r => ({n: r.n, R: r.selections_per_sec.toFixed(2), p: r.accuracy.toFixed(3), BR: r.bit_rate.toFixed(2)}))));
+    for (let n = 3; n <= 32; n++) {
+      const lN = Math.log2(n);
+      const rPred = 1 / Math.max(a + b * lN, 0.05);
+      const pPred = Math.max(0, Math.min(1, p0 - c * lN));
+      const bPred = Math.log2(n - 1) * rPred * Math.max(2 * pPred - 1, 0);
+      curve.push({ n, bit_rate: bPred, r: rPred, p: pPred });
+      console.log('[CalibFit] N=' + n + ' R=' + rPred.toFixed(3) + ' p=' + pPred.toFixed(4) + ' (2p-1)=' + Math.max(2*pPred-1,0).toFixed(4) + ' B=' + bPred.toFixed(3));
+      if (bPred > bestBR) { bestBR = bPred; bestN = n; }
+    }
+
+    // Safety: if predicted accuracy at N* < 0.75, fall back to best calibration round
+    const pAtBest = Math.max(0, Math.min(1, p0 - c * Math.log2(bestN)));
+    let fallback = false;
+    if (pAtBest < 0.75) {
+      const bestRound = rounds.reduce((a, b) => a.bit_rate > b.bit_rate ? a : b);
+      console.log('[CalibFit] SAFETY FALLBACK: pAtBest=' + pAtBest.toFixed(4) + ' < 0.75, bestN was ' + bestN + ', falling back to round N=' + bestRound.n);
+      bestN = bestRound.n;
+      fallback = true;
+    }
+    console.log('[CalibFit] RESULT: argmax N=' + bestN + ' bestBR=' + bestBR.toFixed(3) + ' fallback=' + fallback);
+
+    return { a, b, p0, c, recommended_n: bestN, predicted_br: bestBR, curve, r_squared: rSquared, fallback };
+  }
+
+  // Bayesian linear regression for p(x) = p0 - c*x
+  // Prior: p0 ~ N(1.0, 0.1²), c ~ N(0.02, 0.03²)
+  // Likelihood: Gaussian approx to binomial, σ_i² = p_hat(1-p_hat)/n + 1/(4n)
+  // The +1/(4n) is a continuity correction so p_hat=1.0 still has nonzero variance
+  function fitAccuracyBayes(rounds, a, b) {
+    const PRIOR_P0_MEAN = 1.0;
+    const PRIOR_P0_VAR  = 0.01;    // sigma = 0.1
+    const PRIOR_C_MEAN  = 0.02;
+    const PRIOR_C_VAR   = 0.0009;  // sigma = 0.03
+
+    // Build weighted normal equations for design matrix [[1, -x_i]]
+    // Each row weighted by 1/sigma_i² where sigma_i depends on (p_hat, n) for that round
+    let XtWX_00 = 0, XtWX_01 = 0, XtWX_11 = 0;
+    let XtWy_0 = 0, XtWy_1 = 0;
+    for (const r of rounds) {
+      const pHat = r.accuracy;
+      const n = r.total;
+      const variance = (pHat * (1 - pHat)) / n + 1 / (4 * n);
+      const w = 1 / variance;
+      const x = Math.log2(r.n);
+      // Design row: [1, -x] (so the second coefficient is c, not slope)
+      XtWX_00 += w * 1 * 1;
+      XtWX_01 += w * 1 * (-x);
+      XtWX_11 += w * (-x) * (-x);
+      XtWy_0  += w * 1 * pHat;
+      XtWy_1  += w * (-x) * pHat;
+    }
+
+    // Add prior precision (diagonal) and prior mean contribution
+    const Lambda_00 = XtWX_00 + 1 / PRIOR_P0_VAR;
+    const Lambda_01 = XtWX_01;
+    const Lambda_11 = XtWX_11 + 1 / PRIOR_C_VAR;
+    const rhs_0 = XtWy_0 + PRIOR_P0_MEAN / PRIOR_P0_VAR;
+    const rhs_1 = XtWy_1 + PRIOR_C_MEAN  / PRIOR_C_VAR;
+
+    // Solve 2x2 system: Lambda * [p0; c] = rhs
+    const det = Lambda_00 * Lambda_11 - Lambda_01 * Lambda_01;
+    const bayesP0 = (Lambda_11 * rhs_0 - Lambda_01 * rhs_1) / det;
+    const bayesC  = (Lambda_00 * rhs_1 - Lambda_01 * rhs_0) / det;
+
+    // Sweep N* with Bayes accuracy + OLS Hick's law
+    let bestN = 10, bestBR = 0;
+    for (let n = 3; n <= 32; n++) {
+      const lN = Math.log2(n);
+      const rPred = 1 / Math.max(a + b * lN, 0.05);
+      const pPred = Math.max(0, Math.min(1, bayesP0 - bayesC * lN));
+      const bPred = Math.log2(n - 1) * rPred * Math.max(2 * pPred - 1, 0);
+      if (bPred > bestBR) { bestBR = bPred; bestN = n; }
+    }
+    console.log('[CalibFit] Bayes accuracy: p0=' + bayesP0.toFixed(4) + ' c=' + bayesC.toFixed(4) + ' recommended_n=' + bestN + ' recommended_br=' + bestBR.toFixed(3));
+    return { bayes_p0: bayesP0, bayes_c: bayesC, bayes_recommended_n: bestN, bayes_recommended_br: bestBR };
+  }
+
+  function predictBR(fitResult, n) {
+    const lN = Math.log2(n);
+    const rPred = 1 / Math.max(fitResult.a + fitResult.b * lN, 0.05);
+    const pPred = Math.max(0, Math.min(1, fitResult.p0 - fitResult.c * lN));
+    return Math.log2(n - 1) * rPred * Math.max(2 * pPred - 1, 0);
+  }
+
+  return { fit, fitAccuracyBayes, predictBR };
+})();
+
+// ─────────────────────────────────────────────────────────────────────
+// ChartRenderer — inline SVG visualizations
+// ─────────────────────────────────────────────────────────────────────
+const ChartRenderer = (() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const M = { t: 10, r: 14, b: 26, l: 50 };
+  const FONT = '-apple-system,BlinkMacSystemFont,sans-serif';
+
+  function el(tag, attrs) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  function textEl(svg, x, y, content, anchor, size, fill) {
+    const t = el('text', {
+      x, y, fill: fill || '#666', 'font-size': size || 11,
+      'font-family': FONT, 'text-anchor': anchor || 'start',
+    });
+    t.textContent = content;
+    svg.appendChild(t);
+  }
+
+  function mkScale(dMin, dMax, rMin, rMax) {
+    const span = dMax - dMin || 1;
+    return v => rMin + (v - dMin) / span * (rMax - rMin);
+  }
+
+  function addTitle(container, text) {
+    const d = document.createElement('div');
+    d.className = 'chart-title';
+    d.textContent = text;
+    container.appendChild(d);
+  }
+
+  function makeCard(container, title) {
+    const card = document.createElement('div');
+    card.className = 'chart-card';
+    addTitle(card, title);
+    container.appendChild(card);
+    return card;
+  }
+
+  function addAxes(svg, w, h, xMin, xMax, yMin, yMax) {
+    const pw = w - M.l - M.r, ph = h - M.t - M.b;
+    // Axis lines
+    svg.appendChild(el('line', {
+      x1: M.l, y1: M.t + ph, x2: M.l + pw, y2: M.t + ph,
+      stroke: '#444', 'stroke-width': 1,
+    }));
+    svg.appendChild(el('line', {
+      x1: M.l, y1: M.t, x2: M.l, y2: M.t + ph,
+      stroke: '#444', 'stroke-width': 1,
+    }));
+    // Labels
+    textEl(svg, M.l, M.t + ph + 18, String(xMin), 'start');
+    textEl(svg, M.l + pw, M.t + ph + 18, String(xMax), 'end');
+    textEl(svg, M.l - 6, M.t + ph, String(yMin), 'end');
+    textEl(svg, M.l - 6, M.t + 10, String(yMax), 'end');
+  }
+
+  // ── Chart 1: Reaction Time over Trials ──
+  function renderRTChart(container, trials) {
+    if (trials.length === 0) return;
+    const card = makeCard(container, 'Reaction Time');
+    const W = 400, H = 140;
+    const svg = el('svg', { width: W, height: H, viewBox: '0 0 ' + W + ' ' + H });
+    const pw = W - M.l - M.r, ph = H - M.t - M.b;
+    const rts = trials.map(t => t.rt_ms);
+    const yMax = Math.ceil(Math.max(...rts) * 1.1);
+    const sx = mkScale(1, trials.length, M.l, M.l + pw);
+    const sy = mkScale(0, yMax, M.t + ph, M.t);
+    addAxes(svg, W, H, 1, trials.length, 0, yMax);
+    textEl(svg, M.l + pw / 2, M.t + ph + 18, 'Trial', 'middle');
+    textEl(svg, M.l - 6, M.t + ph / 2, 'ms', 'end', 10);
+
+    // Dots
+    trials.forEach((t, i) => {
+      svg.appendChild(el('circle', {
+        cx: sx(i + 1), cy: sy(t.rt_ms), r: 2.5,
+        fill: t.correct ? '#2ecc71' : '#e74c3c', opacity: 0.7,
+      }));
+    });
+
+    // Rolling average (window=10)
+    const win = 10;
+    const pts = [];
+    let sum = 0;
+    for (let i = 0; i < rts.length; i++) {
+      sum += rts[i];
+      if (i >= win) sum -= rts[i - win];
+      const avg = sum / Math.min(i + 1, win);
+      pts.push(sx(i + 1) + ',' + sy(avg));
+    }
+    svg.appendChild(el('polyline', {
+      points: pts.join(' '), fill: 'none',
+      stroke: '#fff', 'stroke-width': 2, opacity: 0.8,
+    }));
+
+    card.appendChild(svg);
+  }
+
+  // ── Chart 2: Rolling Accuracy ──
+  function renderAccuracyChart(container, trials) {
+    if (trials.length === 0) return;
+    const card = makeCard(container, 'Rolling Accuracy (20-trial window)');
+    const W = 400, H = 120;
+    const svg = el('svg', { width: W, height: H, viewBox: '0 0 ' + W + ' ' + H });
+    const pw = W - M.l - M.r, ph = H - M.t - M.b;
+    const sx = mkScale(1, trials.length, M.l, M.l + pw);
+    const sy = mkScale(0, 100, M.t + ph, M.t);
+    addAxes(svg, W, H, 1, trials.length, '0%', '100%');
+
+    // 50% threshold dashed line
+    svg.appendChild(el('line', {
+      x1: M.l, y1: sy(50), x2: M.l + pw, y2: sy(50),
+      stroke: '#e74c3c', 'stroke-width': 1, 'stroke-dasharray': '4,4', opacity: 0.5,
+    }));
+
+    // Compute rolling accuracy
+    const win = 20;
+    const pts = [];
+    let correct = 0;
+    for (let i = 0; i < trials.length; i++) {
+      if (trials[i].correct) correct++;
+      if (i >= win && trials[i - win].correct) correct--;
+      const w = Math.min(i + 1, win);
+      const acc = (i < win ? trials.slice(0, i + 1).filter(t => t.correct).length / (i + 1) : correct / win) * 100;
+      pts.push({ x: sx(i + 1), y: sy(acc), acc });
+    }
+
+    // Draw colored segments based on Shenoy efficiency (2p-1)
+    for (let i = 1; i < pts.length; i++) {
+      const eff = 2 * (pts[i].acc / 100) - 1;
+      const color = eff > 0.8 ? '#2ecc71' : eff > 0.5 ? '#f1c40f' : '#e74c3c';
+      svg.appendChild(el('line', {
+        x1: pts[i - 1].x, y1: pts[i - 1].y,
+        x2: pts[i].x, y2: pts[i].y,
+        stroke: color, 'stroke-width': 2,
+      }));
+    }
+
+    card.appendChild(svg);
+  }
+
+  // ── Chart 3: Bit Rate Over Time ──
+  function renderBitRateChart(container, trials, n, gameStartMs, totalDurS) {
+    if (trials.length === 0) return;
+    const card = makeCard(container, 'Bit Rate Over Time');
+    const W = 400, H = 120;
+    const svg = el('svg', { width: W, height: H, viewBox: '0 0 ' + W + ' ' + H });
+    const pw = W - M.l - M.r, ph = H - M.t - M.b;
+    const windowS = 5;
+
+    // Compute sliding-window bit rate at each trial
+    const points = [];
+    for (let i = 0; i < trials.length; i++) {
+      const tMs = trials[i].timestamp_ms;
+      const timeS = (tMs - gameStartMs) / 1000;
+      const windowStartMs = tMs - windowS * 1000;
+      let sc = 0, si = 0;
+      for (let j = 0; j <= i; j++) {
+        if (trials[j].timestamp_ms >= windowStartMs) {
+          if (trials[j].correct) sc++; else si++;
+        }
+      }
+      const dur = Math.min(windowS, timeS);
+      const br = BitRateCalculator.compute(n, sc, si, Math.max(dur, 0.001));
+      points.push({ time: timeS, br });
+    }
+
+    const maxBR = Math.max(1, ...points.map(p => p.br)) * 1.15;
+    const finalBR = BitRateCalculator.compute(n,
+      trials.filter(t => t.correct).length,
+      trials.filter(t => !t.correct).length, totalDurS);
+
+    const sx = mkScale(0, totalDurS, M.l, M.l + pw);
+    const sy = mkScale(0, maxBR, M.t + ph, M.t);
+    addAxes(svg, W, H, '0s', totalDurS + 's', '0', maxBR.toFixed(1));
+
+    // Final bit rate dashed line
+    svg.appendChild(el('line', {
+      x1: M.l, y1: sy(finalBR), x2: M.l + pw, y2: sy(finalBR),
+      stroke: '#888', 'stroke-width': 1, 'stroke-dasharray': '4,4', opacity: 0.6,
+    }));
+
+    // Bit rate line
+    if (points.length > 1) {
+      const ptStr = points.map(p => sx(p.time) + ',' + sy(p.br)).join(' ');
+      svg.appendChild(el('polyline', {
+        points: ptStr, fill: 'none', stroke: '#fff', 'stroke-width': 2,
+      }));
+    }
+
+    card.appendChild(svg);
+  }
+
+  // ── Chart 4: Bit Rate vs N (collect mode) ──
+  function renderBitRateVsN(container, rounds) {
+    if (rounds.length === 0) return;
+    const card = makeCard(container, 'Bit Rate vs Alphabet Size');
+    const W = 360, H = 160;
+    const svg = el('svg', { width: W, height: H, viewBox: '0 0 ' + W + ' ' + H });
+    const pw = W - M.l - M.r, ph = H - M.t - M.b;
+    const maxBR = Math.max(1, ...rounds.map(r => r.bit_rate)) * 1.15;
+    const bestIdx = rounds.reduce((bi, r, i, arr) => r.bit_rate > arr[bi].bit_rate ? i : bi, 0);
+
+    const barW = pw / rounds.length * 0.6;
+    const gap = pw / rounds.length;
+
+    addAxes(svg, W, H, rounds[0].alphabet_size, rounds[rounds.length - 1].alphabet_size, '0', maxBR.toFixed(1));
+    const sy = mkScale(0, maxBR, M.t + ph, M.t);
+
+    rounds.forEach((r, i) => {
+      const x = M.l + i * gap + (gap - barW) / 2;
+      const total = r.sc + r.si;
+      const acc = total > 0 ? r.sc / total : 0;
+      const eff = 2 * acc - 1;
+      const color = eff > 0.8 ? '#2ecc71' : eff > 0.5 ? '#f1c40f' : '#e74c3c';
+      const barH = M.t + ph - sy(r.bit_rate);
+
+      svg.appendChild(el('rect', {
+        x, y: sy(r.bit_rate), width: barW, height: Math.max(barH, 1),
+        fill: color, rx: 3, opacity: 0.85,
+      }));
+
+      // N label below bar
+      textEl(svg, x + barW / 2, M.t + ph + 16, 'N=' + r.alphabet_size, 'middle', 10);
+
+      // Star for best
+      if (i === bestIdx) {
+        textEl(svg, x + barW / 2, sy(r.bit_rate) - 6, '\u2605', 'middle', 14, '#f1c40f');
+      }
+    });
+
+    card.appendChild(svg);
+  }
+
+  // ── Chart 5: Accuracy vs N (collect mode) ──
+  function renderAccuracyVsN(container, rounds) {
+    if (rounds.length === 0) return;
+    const card = makeCard(container, 'Accuracy vs Alphabet Size');
+    const W = 360, H = 120;
+    const svg = el('svg', { width: W, height: H, viewBox: '0 0 ' + W + ' ' + H });
+    const pw = W - M.l - M.r, ph = H - M.t - M.b;
+    const gap = pw / (rounds.length - 1 || 1);
+
+    addAxes(svg, W, H, rounds[0].alphabet_size, rounds[rounds.length - 1].alphabet_size, '50%', '100%');
+    const sx = i => M.l + i * gap;
+    const sy = mkScale(50, 100, M.t + ph, M.t);
+
+    // 50% threshold
+    svg.appendChild(el('line', {
+      x1: M.l, y1: sy(50), x2: M.l + pw, y2: sy(50),
+      stroke: '#e74c3c', 'stroke-width': 1, 'stroke-dasharray': '4,4', opacity: 0.5,
+    }));
+
+    // Connecting line
+    const pts = rounds.map((r, i) => {
+      const acc = (r.sc + r.si) > 0 ? r.sc / (r.sc + r.si) * 100 : 50;
+      return sx(i) + ',' + sy(Math.max(acc, 50));
+    });
+    svg.appendChild(el('polyline', {
+      points: pts.join(' '), fill: 'none', stroke: '#3498db', 'stroke-width': 2,
+    }));
+
+    // Dots
+    rounds.forEach((r, i) => {
+      const acc = (r.sc + r.si) > 0 ? r.sc / (r.sc + r.si) * 100 : 50;
+      svg.appendChild(el('circle', {
+        cx: sx(i), cy: sy(Math.max(acc, 50)), r: 4,
+        fill: '#3498db', stroke: '#1a1a2e', 'stroke-width': 2,
+      }));
+    });
+
+    card.appendChild(svg);
+  }
+
+  // ── Chart 6: Calibration predicted bit rate curve ──
+  function renderCalibChart(container, curve, calibRounds, recommendedN) {
+    const card = makeCard(container, 'Predicted Bit Rate vs Alphabet Size');
+    const W = 360, H = 180;
+    const svg = el('svg', { width: W, height: H, viewBox: '0 0 ' + W + ' ' + H });
+    const pw = W - M.l - M.r, ph = H - M.t - M.b;
+    const maxBR = Math.max(1,
+      ...curve.map(p => p.bit_rate),
+      ...calibRounds.map(r => r.bit_rate)
+    ) * 1.15;
+    const sx = mkScale(3, 32, M.l, M.l + pw);
+    const sy = mkScale(0, maxBR, M.t + ph, M.t);
+    addAxes(svg, W, H, 3, 32, '0', maxBR.toFixed(1));
+    textEl(svg, M.l + pw / 2, M.t + ph + 18, 'N', 'middle');
+
+    // Predicted curve
+    const ptStr = curve.map(p => sx(p.n) + ',' + sy(p.bit_rate)).join(' ');
+    svg.appendChild(el('polyline', {
+      points: ptStr, fill: 'none', stroke: '#fff', 'stroke-width': 2,
+    }));
+
+    // Vertical dashed line at N*
+    svg.appendChild(el('line', {
+      x1: sx(recommendedN), y1: M.t, x2: sx(recommendedN), y2: M.t + ph,
+      stroke: '#f1c40f', 'stroke-width': 1, 'stroke-dasharray': '4,4', opacity: 0.7,
+    }));
+
+    // Calibration data points (actual measured)
+    calibRounds.forEach(r => {
+      svg.appendChild(el('circle', {
+        cx: sx(r.n), cy: sy(r.bit_rate), r: 5,
+        fill: '#3498db', stroke: '#1a1a2e', 'stroke-width': 2,
+      }));
+    });
+
+    card.appendChild(svg);
+  }
+
+  // ── Confusion Matrix Heatmap ──
+  function renderConfusionMatrix(container, summary) {
+    if (!summary || summary.total === 0) return;
+
+    const confusion = summary.confusion;
+    const alpha = summary.alphabetUsed;
+    const N = alpha.length;
+
+    // Filter to only keys that appeared as targets or responses
+    const activeIndices = [];
+    for (let i = 0; i < N; i++) {
+      let hasData = false;
+      for (let j = 0; j < N; j++) {
+        if (confusion[i][j] > 0 || confusion[j][i] > 0) { hasData = true; break; }
+      }
+      if (hasData) activeIndices.push(i);
+    }
+
+    const nActive = activeIndices.length;
+    if (nActive === 0) return;
+
+    const card = makeCard(container, 'Confusion Matrix (target vs response)');
+
+    const cellSize = Math.min(16, Math.floor(320 / nActive));
+    const labelSpace = 40;
+    const W = labelSpace + nActive * cellSize + 60;
+    const H = labelSpace + nActive * cellSize + 30;
+    const svg = el('svg', { width: W, height: H, viewBox: '0 0 ' + W + ' ' + H });
+
+    // Find max count for color scaling
+    let maxCount = 0;
+    for (let i = 0; i < nActive; i++) {
+      for (let j = 0; j < nActive; j++) {
+        const val = confusion[activeIndices[i]][activeIndices[j]];
+        if (val > maxCount) maxCount = val;
+      }
+    }
+    if (maxCount === 0) maxCount = 1;
+
+    // Draw cells
+    for (let i = 0; i < nActive; i++) {
+      for (let j = 0; j < nActive; j++) {
+        const val = confusion[activeIndices[i]][activeIndices[j]];
+        if (val === 0) continue;
+
+        const intensity = val / maxCount;
+        const onDiag = i === j;
+        // Diagonal (correct): green. Off-diagonal (errors): red.
+        const r = onDiag ? Math.round(46 + (204 - 46) * intensity) : Math.round(231 * intensity);
+        const g = onDiag ? Math.round(204 * intensity) : Math.round(76 * intensity * 0.3);
+        const b = onDiag ? Math.round(113 * intensity * 0.5) : Math.round(60 * intensity * 0.3);
+        const color = 'rgb(' + r + ',' + g + ',' + b + ')';
+
+        svg.appendChild(el('rect', {
+          x: labelSpace + j * cellSize,
+          y: i * cellSize,
+          width: cellSize - 1,
+          height: cellSize - 1,
+          fill: color,
+          rx: 1,
+        }));
+      }
+    }
+
+    // Row labels (targets, left side)
+    for (let i = 0; i < nActive; i++) {
+      const key = alpha[activeIndices[i]];
+      const label = key === 'SPACE' ? 'SP' : key;
+      textEl(svg, labelSpace - 4, i * cellSize + cellSize / 2 + 4, label, 'end',
+        Math.min(10, cellSize - 1), '#888');
+    }
+
+    // Column labels (responses, bottom)
+    for (let j = 0; j < nActive; j++) {
+      const key = alpha[activeIndices[j]];
+      const label = key === 'SPACE' ? 'SP' : key;
+      textEl(svg, labelSpace + j * cellSize + cellSize / 2, nActive * cellSize + 12, label,
+        'middle', Math.min(10, cellSize - 1), '#888');
+    }
+
+    // Axis labels
+    const targetLabelX = labelSpace - 28;
+    const targetLabel = el('text', {
+      x: targetLabelX, y: nActive * cellSize / 2,
+      fill: '#666', 'font-size': 9,
+      'font-family': FONT, 'text-anchor': 'middle',
+      transform: 'rotate(-90, ' + targetLabelX + ', ' + (nActive * cellSize / 2) + ')',
+    });
+    targetLabel.textContent = 'Target';
+    svg.appendChild(targetLabel);
+    textEl(svg, labelSpace + nActive * cellSize / 2, nActive * cellSize + 24, 'Response', 'middle', 9, '#666');
+
+    card.appendChild(svg);
+  }
+
+  // ── Channel Throughput Comparison ──
+  function renderThroughputComparison(container, summary) {
+    if (!summary) return;
+
+    const card = makeCard(container, 'Information Throughput Analysis');
+
+    const bars = [
+      { label: 'Shenoy achieved', value: summary.shenoyBR, color: '#3498db' },
+      { label: 'Mutual information', value: summary.miThroughput, color: '#9b59b6' },
+      { label: 'Theoretical max', value: summary.theoreticalMax, color: '#555' },
+    ];
+
+    const W = 480, barH = 24, gap = 8, labelW = 140;
+    const H = bars.length * (barH + gap) + 44;
+    const svg = el('svg', { width: W, height: H, viewBox: '0 0 ' + W + ' ' + H });
+    const maxVal = Math.max(...bars.map(b => b.value), 0.1);
+    const barArea = W - labelW - 60;
+
+    bars.forEach((b, i) => {
+      const y = i * (barH + gap);
+      const barW = Math.max(1, (b.value / maxVal) * barArea);
+
+      // Label
+      textEl(svg, labelW - 8, y + barH / 2 + 4, b.label, 'end', 11, '#aaa');
+
+      // Bar
+      svg.appendChild(el('rect', {
+        x: labelW, y: y + 2, width: barW, height: barH - 4,
+        fill: b.color, rx: 3, opacity: 0.85,
+      }));
+
+      // Value
+      textEl(svg, labelW + barW + 6, y + barH / 2 + 4,
+        b.value.toFixed(2) + ' bps', 'start', 11, '#ccc');
+    });
+
+    // Summary text below
+    const textY = bars.length * (barH + gap) + 8;
+    const miPerSel = summary.miPerSelection;
+    const maxMI = summary.maxMIPerSelection;
+    const infoLoss = maxMI - miPerSel;
+    textEl(svg, W / 2, textY,
+      'MI/sel: ' + miPerSel.toFixed(2) + ' / ' + maxMI.toFixed(2) +
+      ' bits  (loss: ' + infoLoss.toFixed(2) + ' bits/sel)',
+      'middle', 9, '#888');
+
+    const textY2 = textY + 14;
+    const shenoyGap = summary.miThroughput - summary.shenoyBR;
+    textEl(svg, W / 2, textY2,
+      'Shenoy vs MI gap: ' + shenoyGap.toFixed(2) + ' bps  ' +
+      '(each error costs 2 net correct)',
+      'middle', 9, '#888');
+
+    card.appendChild(svg);
+  }
+
+  // ── Speed-Accuracy Operating Point ──
+  function renderSpeedAccuracyDot(container, selectionsPerSec, accuracy, n, bitRate) {
+    const card = makeCard(container, 'Speed-Accuracy Operating Point');
+    const W = 300, H = 200;
+    const svg = el('svg', { width: W, height: H, viewBox: '0 0 ' + W + ' ' + H });
+    const pw = W - M.l - M.r, ph = H - M.t - M.b;
+
+    const maxR = Math.max(4, Math.ceil(selectionsPerSec * 1.5));
+    const sx = mkScale(0, maxR, M.l, M.l + pw);
+    const sy = mkScale(0.5, 1.0, M.t + ph, M.t);
+
+    addAxes(svg, W, H, '0', maxR.toFixed(0), '50%', '100%');
+    textEl(svg, M.l + pw / 2, M.t + ph + 18, 'Selections/sec', 'middle');
+
+    // Iso-bit-rate curves
+    const isoRates = [2, 4, 6, 8, 10, 12, 14];
+    isoRates.forEach(bps => {
+      const pts = [];
+      for (let r = 0.5; r <= maxR; r += 0.2) {
+        const p = (bps / (Math.log2(n - 1) * r) + 1) / 2;
+        if (p >= 0.5 && p <= 1.0) {
+          pts.push(sx(r) + ',' + sy(p));
+        }
+      }
+      if (pts.length > 1) {
+        svg.appendChild(el('polyline', {
+          points: pts.join(' '), fill: 'none',
+          stroke: 'rgba(255,255,255,0.08)', 'stroke-width': 1,
+        }));
+        const lastPt = pts[pts.length - 1].split(',');
+        if (parseFloat(lastPt[1]) > M.t + 10) {
+          textEl(svg, parseFloat(lastPt[0]) + 4, parseFloat(lastPt[1]) + 3,
+            bps + '', 'start', 8, 'rgba(255,255,255,0.15)');
+        }
+      }
+    });
+
+    // Player's dot
+    svg.appendChild(el('circle', {
+      cx: sx(selectionsPerSec), cy: sy(Math.min(accuracy, 1)),
+      r: 6, fill: '#3498db', stroke: '#fff', 'stroke-width': 2,
+    }));
+    textEl(svg, sx(selectionsPerSec) + 10, sy(Math.min(accuracy, 1)) + 4,
+      bitRate.toFixed(1) + ' bps', 'start', 11, '#fff');
+
+    card.appendChild(svg);
+  }
+
+  return { renderRTChart, renderAccuracyChart, renderBitRateChart, renderBitRateVsN, renderAccuracyVsN, renderCalibChart, renderConfusionMatrix, renderThroughputComparison, renderSpeedAccuracyDot };
+})();
+
+
+// ─────────────────────────────────────────────────────────────────────
+// KeyboardDiagram — miniature QWERTY position reference
+// ─────────────────────────────────────────────────────────────────────
+const KeyboardDiagram = (() => {
+  const ROWS = [
+    ['Q','W','E','R','T','Y','U','I','O','P'],
+    ['A','S','D','F','G','H','J','K','L',';',"'"],
+    ['Z','X','C','V','B','N','M',',','.','/'],
+  ];
+  const diagramEl = document.getElementById('kb-diagram');
+  const rowEls = [
+    document.getElementById('kb-row-1'),
+    document.getElementById('kb-row-2'),
+    document.getElementById('kb-row-3'),
+  ];
+  const spaceRowEl = document.getElementById('kb-row-space');
+  const keyEls = {};
+
+  function build(activeAlphabet) {
+    const activeSet = new Set(activeAlphabet);
+    ROWS.forEach((row, ri) => {
+      rowEls[ri].innerHTML = '';
+      row.forEach(letter => {
+        const d = document.createElement('div');
+        d.className = 'kb-key' + (activeSet.has(letter) ? '' : ' kb-inactive');
+        d.textContent = letter;
+        d.id = 'kb-key-' + letter;
+        rowEls[ri].appendChild(d);
+        keyEls[letter] = d;
+      });
+    });
+    // Spacebar row
+    spaceRowEl.innerHTML = '';
+    if (activeSet.has('SPACE')) {
+      spaceRowEl.style.display = 'flex';
+      const d = document.createElement('div');
+      d.className = 'kb-key kb-key-space';
+      d.style.width = '80px';
+      d.style.fontSize = '11px';
+      d.textContent = 'SPACE';
+      d.id = 'kb-key-SPACE';
+      spaceRowEl.appendChild(d);
+      keyEls['SPACE'] = d;
+    } else {
+      spaceRowEl.style.display = 'none';
+    }
+    diagramEl.style.display = 'flex';
+  }
+
+  function update(target, next) {
+    for (const letter in keyEls) {
+      const el = keyEls[letter];
+      el.classList.remove('kb-target', 'kb-next');
+    }
+    if (target && keyEls[target]) {
+      void keyEls[target].offsetWidth;   // force reflow to restart CSS transition on repeat key
+      keyEls[target].classList.add('kb-target');
+    }
+    if (next && keyEls[next]) keyEls[next].classList.add('kb-next');
+  }
+
+  function hide() {
+    diagramEl.style.display = 'none';
+  }
+
+  return { build, update, hide };
+})();
+
+// ─────────────────────────────────────────────────────────────────────
+// ErrorPatterns — render common error pairs
+// ─────────────────────────────────────────────────────────────────────
+function renderErrorPatterns(containerId, trials) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  const errors = trials.filter(t => !t.correct);
+  if (errors.length === 0) return;
+  const counts = new Map();
+  errors.forEach(t => {
+    const key = displayKey(t.target) + '\u2192' + displayKey(t.response);
+    counts.set(key, (counts.get(key) || 0) + 1);
+  });
+  const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
+  const title = document.createElement('div');
+  title.textContent = 'Error Patterns';
+  title.style.cssText = 'font-size: 16px; color: #888; margin-top: 16px; margin-bottom: 8px;';
+  container.appendChild(title);
+  sorted.forEach(([pair, count]) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'font-family: "SF Mono","Fira Code","Cascadia Code","Consolas",monospace; font-size: 14px; color: #ccc; padding: 2px 0;';
+    row.textContent = pair.replace('\u2192', ' \u2192 ') + '  (' + count + '\u00d7)';
+    container.appendChild(row);
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// GameState — full state machine
+// ─────────────────────────────────────────────────────────────────────
+const GAME_DURATION_S = 60;
+const N = 10;
+const QUEUE_LENGTH = 5;
+const CALIB_N_VALUES = [16, 26, 7];
+const CALIB_EDGE_KEYS = ['Q', 'P', 'Z', '/', "'", ',', '.'];
+const CALIB_DURATION_S = 7;
+const CALIB_REST_S = 3;
+
+const GameState = (() => {
+  let currentState = null;
+  let alphabet = [];
+  let sc = 0, si = 0, streak = 0;
+  let gameStartTime = 0, targetShownTime = 0;
+  let inputFrozen = false;
+  let settingsDuration = CUSTOM_DURATION || GAME_DURATION_S;
+  let skippedCalibration = false;
+  let firstWelcome = true;
+  let rafId = null;
+  let targetQueue = [];
+  let currentN = N;
+  let currentDuration = GAME_DURATION_S;
+  const logger = new TrialLogger();
+
+  // Calibration state (normal mode)
+  let calibRoundIndex = 0;
+  let calibRounds = [];
+  let calibFit = null;
+  let calibBayes = null;
+  let calibKeyStats = [];
+  let optimizedAlphabet = null;
+  let selectedN = N;
+  let recommendedN = N;
+  let modelRecommendedN = N;
+
+  // Collect mode state
+  let participantId = '';
+  let collectRoundIndex = 0;
+  let collectRounds = [];
+  let masterTrials = [];
+
+  // DOM refs
+  const roundIndicator = document.getElementById('round-indicator');
+  const timerEl = document.getElementById('timer');
+  const targetEl = document.getElementById('target-current');
+  const look1 = document.getElementById('look-1');
+  const look2 = document.getElementById('look-2');
+  const look3 = document.getElementById('look-3');
+  const look4 = document.getElementById('look-4');
+  const bitrateEl = document.getElementById('bitrate-display');
+  const accuracyEl = document.getElementById('accuracy-display');
+  const countsEl = document.getElementById('counts');
+  const streakEl = document.getElementById('streak');
+  const keycapDisplay = document.getElementById('keycap-display');
+  const welcomeMeta = document.getElementById('welcome-meta');
+  const countdownChar = document.getElementById('countdown-char');
+  const participantInput = document.getElementById("name-input");
+
+  // ── Helpers ──
+
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  function pickRandomTarget() {
+    return alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+
+  function initQueue() {
+    targetQueue = [];
+    for (let i = 0; i < QUEUE_LENGTH; i++) targetQueue.push(pickRandomTarget());
+  }
+
+  function renderQueue() {
+    const currentDisplay = displayKey(targetQueue[0]);
+    targetEl.textContent = currentDisplay;
+    targetEl.style.fontSize = currentDisplay === 'SPACE' ? '32px' : '';
+    targetEl.style.letterSpacing = currentDisplay === 'SPACE' ? '0' : '';
+    look1.textContent = displayKey(targetQueue[1]);
+    look2.textContent = displayKey(targetQueue[2]);
+    look3.textContent = displayKey(targetQueue[3]);
+    look4.textContent = displayKey(targetQueue[4]);
+    [look1, look2, look3, look4].forEach(el => {
+      if (el.textContent === 'SPACE') {
+        el.style.fontSize = (parseFloat(getComputedStyle(el).fontSize) * 0.55) + 'px';
+        el.style.letterSpacing = '-1px';
+      } else {
+        el.style.fontSize = '';
+        el.style.letterSpacing = '';
+      }
+    });
+    KeyboardDiagram.update(targetQueue[0], targetQueue[1]);
+  }
+
+  function advanceQueue() {
+    targetQueue.shift();
+    targetQueue.push(pickRandomTarget());
+    targetShownTime = performance.now();
+    renderQueue();
+    AudioFeedback.spatialCue(targetQueue[0]);
+  }
+
+  function updateStatsDisplay(tElapsed) {
+    const remaining = Math.max(0, currentDuration - tElapsed);
+    timerEl.textContent = remaining.toFixed(1);
+    bitrateEl.textContent = BitRateCalculator.compute(currentN, sc, si, tElapsed).toFixed(2) + ' bits/s';
+    const total = sc + si;
+    accuracyEl.textContent = total > 0 ? (100 * sc / total).toFixed(1) + '%' : '\u2014';
+    countsEl.textContent = 'Sc: ' + sc + '   Si: ' + si;
+  }
+
+  function updateStreakDisplay() {
+    streakEl.textContent = 'Streak: ' + streak;
+    streakEl.className = streak >= 10 ? 'glow' : streak >= 5 ? 'gold' : '';
+    if (streak > 0 && streak % 10 === 0) {
+      streakEl.classList.remove('milestone');
+      void streakEl.offsetWidth;
+      streakEl.classList.add('milestone');
+      spawnStreakBurst();
+    }
+  }
+
+  function spawnStreakBurst() {
+    const rect = streakEl.getBoundingClientRect();
+    const burst = document.createElement('div');
+    burst.style.cssText = 'position:fixed;left:' + (rect.left + rect.width / 2 - 20) +
+      'px;top:' + (rect.top + rect.height / 2 - 20) + 'px;width:40px;height:40px;' +
+      'border:2px solid #f1c40f;border-radius:50%;pointer-events:none;' +
+      'animation:streak-burst 500ms ease-out forwards;z-index:1000;';
+    document.body.appendChild(burst);
+    setTimeout(() => burst.remove(), 600);
+  }
+
+  function updateMomentum() {
+    const fill = document.getElementById('momentum-fill');
+    if (!fill) return;
+    const recent = logger.trials.slice(-5);
+    if (recent.length < 2) return;
+    const recentCorrect = recent.filter(t => t.correct).length;
+    const recentTime = (recent[recent.length - 1].timestamp_ms - recent[0].timestamp_ms) / 1000;
+    if (recentTime <= 0) return;
+    const instantBPS = Math.log2(currentN - 1) * recentCorrect / recentTime;
+    const theoreticalMax = Math.log2(currentN - 1) * (1000 / 200);
+    const pct = Math.min(100, Math.max(0, (instantBPS / theoreticalMax) * 100));
+    fill.style.width = pct + '%';
+    if (pct > 70) fill.style.background = '#2ecc71';
+    else if (pct > 40) fill.style.background = '#3498db';
+    else fill.style.background = '#e67e22';
+  }
+
+  function flashTarget(cls, ms) {
+    targetEl.classList.remove('flash-correct', 'flash-incorrect', 'flash-invalid');
+    void targetEl.offsetWidth;
+    targetEl.classList.add(cls);
+    setTimeout(() => targetEl.classList.remove(cls), ms);
+  }
+
+  function detectPhaseShift() {
+    const t = logger.trials;
+    const len = t.length;
+    if (len < 3) return false;
+    return t[len - 3].correct === false &&
+           t[len - 2].correct === false &&
+           t[len - 1].correct === false &&
+           t[len - 3].response === t[len - 2].target &&
+           t[len - 2].response === t[len - 1].target &&
+           t[len - 1].response === targetQueue[1];
+  }
+
+  function triggerResync() {
+    inputFrozen = true;
+    const overlay = document.getElementById('resync-overlay');
+    overlay.classList.remove('active');
+    void overlay.offsetWidth;
+    overlay.classList.add('active');
+    targetEl.classList.remove('pulse');
+    void targetEl.offsetWidth;
+    targetEl.classList.add('pulse');
+    setTimeout(() => {
+      inputFrozen = false;
+      targetShownTime = performance.now();
+    }, 500);
+  }
+
+  function buildKeycapDisplay() {
+    const skipCheck = document.getElementById('skip-calib-check');
+    const nSlider = document.getElementById('settings-n-slider');
+    const skipChecked = skipCheck && skipCheck.checked;
+    const displayN = skipChecked ? parseInt(nSlider.value) : N;
+    const keys = KeySubsetSelector.getKeySubset(displayN);
+    keycapDisplay.innerHTML = '';
+    keys.forEach(k => {
+      const d = document.createElement('div');
+      d.className = 'keycap' + (k === 'SPACE' ? ' keycap-space' : '');
+      d.textContent = displayKey(k);
+      keycapDisplay.appendChild(d);
+    });
+    const durText = settingsDuration + ' seconds';
+    const nText = skipChecked ? 'N = ' + nSlider.value : 'N optimized by calibration';
+    welcomeMeta.textContent = durText + ' \u00B7 ' + nText;
+    let pb = 0;
+    try { pb = parseFloat(localStorage.getItem('bitrate_personal_best') || '0'); } catch (e) {}
+    if (pb > 0) {
+      welcomeMeta.textContent += '  \u00B7  Personal best: ' + pb.toFixed(2) + ' bits/s';
+    }
+  }
+
+  function median(arr) {
+    if (arr.length === 0) return 0;
+    const sorted = [...arr].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  }
+
+  function saveCalibRound() {
+    const total = sc + si;
+    const acc = total > 0 ? sc / total : 0;
+    const rts = logger.trials.map(t => t.rt_ms);
+    calibRounds.push({
+      n: currentN,
+      sc, si, total, accuracy: acc,
+      mean_rt_ms: rts.length > 0 ? rts.reduce((s, v) => s + v, 0) / rts.length : 0,
+      median_rt_ms: median(rts),
+      selections_per_sec: total / CALIB_DURATION_S,
+      bit_rate: BitRateCalculator.compute(currentN, sc, si, CALIB_DURATION_S),
+      trials: logger.trials.map(t => ({ ...t })),
+    });
+  }
+
+  function computePerKeyStats() {
+    const map = new Map();
+    calibRounds.forEach(r => {
+      (r.trials || []).forEach(t => {
+        if (!map.has(t.target)) map.set(t.target, { attempts: 0, correct: 0, rts: [] });
+        const s = map.get(t.target);
+        s.attempts++;
+        if (t.correct) s.correct++;
+        s.rts.push(t.rt_ms);
+      });
+    });
+    const stats = [];
+    map.forEach((s, key) => {
+      const accuracy = s.attempts > 0 ? s.correct / s.attempts : 0;
+      const mean_rt_ms = s.rts.length > 0 ? s.rts.reduce((a, b) => a + b, 0) / s.rts.length : 999;
+      const error_rate = 1 - accuracy;
+      stats.push({
+        key, attempts: s.attempts, correct: s.correct,
+        accuracy: parseFloat(accuracy.toFixed(4)),
+        mean_rt_ms: parseFloat(mean_rt_ms.toFixed(1)),
+        composite_score: parseFloat((mean_rt_ms * (1 + 3 * error_rate)).toFixed(1)),
+      });
+    });
+    stats.sort((a, b) => a.composite_score - b.composite_score);
+    return stats;
+  }
+
+  function computeAlphabetBitRate(alpha, statsMap) {
+    const n = alpha.length;
+    if (n < 3) return 0;
+
+    const withData = [];
+    alpha.forEach(k => {
+      const s = statsMap.get(k);
+      if (s && s.attempts >= 1) withData.push(s);
+    });
+
+    if (withData.length === 0) {
+      return CalibrationFitter.predictBR(calibFit, n);
+    }
+
+    const totalAttempts = withData.reduce((s, k) => s + k.attempts, 0);
+    const totalCorrect = withData.reduce((s, k) => s + k.correct, 0);
+    const weightedRT = withData.reduce((s, k) => s + k.mean_rt_ms * k.attempts, 0) / totalAttempts;
+    const weightedAcc = totalCorrect / totalAttempts;
+
+    if (withData.length < n && calibFit) {
+      const measuredFraction = withData.length / n;
+      const modelRT = 1000 * (calibFit.a + calibFit.b * Math.log2(n));
+      const modelAcc = Math.max(0, Math.min(1, calibFit.p0 - calibFit.c * Math.log2(n)));
+
+      const blendedRT = weightedRT * measuredFraction + modelRT * (1 - measuredFraction);
+      const blendedAcc = weightedAcc * measuredFraction + modelAcc * (1 - measuredFraction);
+
+      const rate = 1000 / blendedRT;
+      return Math.log2(n - 1) * rate * Math.max(2 * blendedAcc - 1, 0);
+    }
+
+    const rate = 1000 / weightedRT;
+    return Math.log2(n - 1) * rate * Math.max(2 * weightedAcc - 1, 0);
+  }
+
+  function pruneAlphabet(alpha, keyStats) {
+    const statsMap = new Map();
+    keyStats.forEach(s => statsMap.set(s.key, s));
+
+    let current = [...alpha];
+    let pruneStep = 0;
+
+    while (current.length > 3) {
+      const bCurrent = computeAlphabetBitRate(current, statsMap);
+
+      // Find the worst key (highest composite score with enough data)
+      let worstIdx = -1;
+      let worstScore = -Infinity;
+      for (let i = 0; i < current.length; i++) {
+        const s = statsMap.get(current[i]);
+        if (s && s.attempts >= 1) {
+          if (s.composite_score > worstScore) {
+            worstScore = s.composite_score;
+            worstIdx = i;
+          }
+        }
+      }
+
+      if (worstIdx === -1) break;
+
+      const without = current.filter((_, i) => i !== worstIdx);
+      const bWithout = computeAlphabetBitRate(without, statsMap);
+
+      console.log('[Prune] step=' + pruneStep + ' N=' + current.length + ' BR=' + bCurrent.toFixed(3) + ' worst=' + current[worstIdx] + '(score=' + worstScore.toFixed(1) + ') BR_without=' + bWithout.toFixed(3) + (bWithout >= bCurrent ? ' REMOVING' : ' STOP'));
+      pruneStep++;
+
+      if (bWithout >= bCurrent) {
+        current = without;
+      } else {
+        break;
+      }
+    }
+
+    return current;
+  }
+
+  function runCountdown(nextState) {
+    showScreen('countdown-screen');
+    const seq = [
+      { text: '3', delay: 800 }, { text: '2', delay: 800 },
+      { text: '1', delay: 800 }, { text: 'GO', delay: 400 },
+    ];
+    let i = 0;
+    countdownChar.textContent = seq[0].text;
+    countdownChar.style.animation = 'none';
+    void countdownChar.offsetWidth;
+    countdownChar.style.animation = '';
+    AudioFeedback.countdownTick();
+
+    function next() {
+      i++;
+      if (i >= seq.length) { transition(nextState); return; }
+      countdownChar.textContent = seq[i].text;
+      countdownChar.style.animation = 'none';
+      void countdownChar.offsetWidth;
+      countdownChar.style.animation = '';
+      if (seq[i].text === 'GO') AudioFeedback.countdownGo();
+      else AudioFeedback.countdownTick();
+      setTimeout(next, seq[i].delay);
+    }
+    setTimeout(next, seq[0].delay);
+  }
+
+  // Shared game enter logic (used by both GAME and COLLECT_GAME)
+  function enterGame() {
+    showScreen('game-screen');
+    alphabet = optimizedAlphabet || KeySubsetSelector.getKeySubset(currentN);
+    sc = 0; si = 0; streak = 0;
+    logger.trials.length = 0;
+    initQueue();
+    KeyboardDiagram.build(alphabet);
+    renderQueue();
+    AudioFeedback.spatialCue(targetQueue[0]);
+    gameStartTime = performance.now();
+    targetShownTime = gameStartTime;
+    updateStatsDisplay(0);
+    updateStreakDisplay();
+    const mFill = document.getElementById('momentum-fill');
+    if (mFill) mFill.style.width = '0%';
+    document.addEventListener('keydown', onGameKeyDown);
+  }
+
+  function exitGame() {
+    document.removeEventListener('keydown', onGameKeyDown);
+    KeyboardDiagram.hide();
+  }
+
+  // Build normal-mode JSON
+  function buildNormalJSON() {
+    const total = sc + si;
+    const acc = total > 0 ? sc / total : 0;
+    const result = {
+      mode: skippedCalibration ? 'sandbox' : 'normal',
+      timestamp: new Date().toISOString(),
+      alphabet_size: currentN,
+      alphabet: [...alphabet],
+      duration_s: currentDuration,
+      sc, si,
+      accuracy: parseFloat(acc.toFixed(4)),
+      bit_rate: parseFloat(BitRateCalculator.compute(currentN, sc, si, currentDuration).toFixed(2)),
+      shenoy_efficiency: parseFloat((total > 0 ? 2 * acc - 1 : 0).toFixed(4)),
+      trials: logger.trials.map(t => ({ ...t })),
+    };
+    if (skippedCalibration) {
+      result.skip_calibration = true;
+      result.manual_n = currentN;
+    }
+    if (settingsDuration !== GAME_DURATION_S) result.custom_duration = settingsDuration;
+    if (calibFit) {
+      const calibExport = {
+        rounds: calibRounds.map(r => {
+          const { trials, ...rest } = r;
+          return rest;
+        }),
+        fitted_a: parseFloat(calibFit.a.toFixed(6)),
+        fitted_b: parseFloat(calibFit.b.toFixed(6)),
+        fitted_p0: parseFloat(calibFit.p0.toFixed(6)),
+        fitted_c: parseFloat(calibFit.c.toFixed(6)),
+        model_recommended_n: modelRecommendedN,
+        recommended_n: recommendedN,
+        pruned_keys: modelRecommendedN - recommendedN,
+        selected_n: selectedN,
+      };
+      if (calibBayes) {
+        calibExport.bayes_p0 = parseFloat(calibBayes.bayes_p0.toFixed(6));
+        calibExport.bayes_c = parseFloat(calibBayes.bayes_c.toFixed(6));
+        calibExport.bayes_recommended_n = calibBayes.bayes_recommended_n;
+        calibExport.bayes_recommended_br = parseFloat(calibBayes.bayes_recommended_br.toFixed(4));
+      }
+      if (calibKeyStats.length > 0) {
+        calibExport.per_key_stats = calibKeyStats;
+        calibExport.optimized_alphabet = [...alphabet];
+        const full = KeySubsetSelector.getKeySubset(32);
+        const alphaSet = new Set(alphabet);
+        const excluded = full.filter(k => !alphaSet.has(k));
+        if (excluded.length > 0) calibExport.excluded_keys = excluded;
+      }
+      result.calibration = calibExport;
+    }
+    if (lastInfoSummary) {
+      result.information_theory = {
+        mutual_information_per_selection: parseFloat(lastInfoSummary.miPerSelection.toFixed(4)),
+        mi_throughput_bps: parseFloat(lastInfoSummary.miThroughput.toFixed(2)),
+        theoretical_max_bps: parseFloat(lastInfoSummary.theoreticalMax.toFixed(2)),
+        shenoy_efficiency: parseFloat(lastInfoSummary.shenoyEfficiency.toFixed(4)),
+        mi_efficiency: parseFloat(lastInfoSummary.miEfficiency.toFixed(4)),
+        bias_correction: parseFloat(lastInfoSummary.bias.toFixed(6)),
+      };
+    }
+    return result;
+  }
+
+  // Build collect-mode JSON
+  function buildCollectJSON() {
+    const best = collectRounds.reduce((a, b) => a.bit_rate > b.bit_rate ? a : b, collectRounds[0]);
+    const accByN = {};
+    collectRounds.forEach(r => { accByN[r.alphabet_size] = parseFloat(r.accuracy.toFixed(4)); });
+    return {
+      mode: 'collect',
+      name: participantId,
+      timestamp: new Date().toISOString(),
+      rounds: collectRounds.map(r => ({
+        round: r.round,
+        alphabet_size: r.alphabet_size,
+        alphabet: r.alphabet,
+        duration_s: r.duration_s,
+        sc: r.sc, si: r.si,
+        accuracy: parseFloat(r.accuracy.toFixed(4)),
+        bit_rate: parseFloat(r.bit_rate.toFixed(2)),
+        shenoy_efficiency: parseFloat(r.shenoy_efficiency.toFixed(4)),
+        trials: r.trials,
+      })),
+      summary: {
+        best_bit_rate: parseFloat(best.bit_rate.toFixed(2)),
+        best_n: best.alphabet_size,
+        accuracy_by_n: accByN,
+      },
+    };
+  }
+
+  // Render analytics for normal-mode results
+  function renderNormalAnalytics() {
+    const c = document.getElementById('analytics-container');
+    c.innerHTML = '';
+    const trials = logger.trials;
+    ChartRenderer.renderRTChart(c, trials);
+    ChartRenderer.renderAccuracyChart(c, trials);
+    ChartRenderer.renderBitRateChart(c, trials, currentN, gameStartTime, currentDuration);
+
+    // Information-theoretic analysis
+    lastInfoSummary = InfoTheory.throughputSummary(
+      trials, alphabet, currentDuration, currentN, sc, si
+    );
+    ChartRenderer.renderConfusionMatrix(c, lastInfoSummary);
+    ChartRenderer.renderThroughputComparison(c, lastInfoSummary);
+
+    // Speed-accuracy operating point
+    const totalSelections = trials.length;
+    const selPerSec = totalSelections / currentDuration;
+    const finalAcc = totalSelections > 0 ? sc / totalSelections : 1;
+    const finalBR = BitRateCalculator.compute(currentN, sc, si, currentDuration);
+    ChartRenderer.renderSpeedAccuracyDot(c, selPerSec, finalAcc, currentN, finalBR);
+  }
+
+  // Render analytics for collect-mode results
+  function renderCollectAnalytics() {
+    const c = document.getElementById('collect-analytics');
+    c.innerHTML = '';
+    // Charts 1-2 using all master trials
+    ChartRenderer.renderRTChart(c, masterTrials);
+    ChartRenderer.renderAccuracyChart(c, masterTrials);
+
+    // Chart 3: per-round bit rate concatenated
+    // Build a combined trial array with time offsets per round
+    const combinedTrials = [];
+    let timeOffset = 0;
+    collectRounds.forEach(r => {
+      if (r.trials.length > 0) {
+        const roundStart = r.trials[0].timestamp_ms - r.trials[0].rt_ms;
+        r.trials.forEach(t => {
+          combinedTrials.push({
+            ...t,
+            timestamp_ms: roundStart + (t.timestamp_ms - roundStart),
+            _offset_time_s: timeOffset + (t.timestamp_ms - roundStart) / 1000,
+            _n: r.alphabet_size,
+          });
+        });
+      }
+      timeOffset += r.duration_s;
+    });
+
+    // For chart 3, render per-round segments
+    if (combinedTrials.length > 0) {
+      const totalDur = COLLECT_N_VALUES.length * COLLECT_DURATION_S;
+      const chartContainer = document.createElement('div');
+      c.appendChild(chartContainer);
+
+      // Render bit rate chart using first round's approach as approximation
+      // Use the combined trials with offset times
+      const title = document.createElement('div');
+      title.className = 'chart-title';
+      title.textContent = 'Bit Rate Over Time (all rounds)';
+      chartContainer.appendChild(title);
+
+      const W = 360, H = 120, NS = 'http://www.w3.org/2000/svg';
+      const ML = 50, MR = 14, MT = 10, MB = 26;
+      const pw = W - ML - MR, ph = H - MT - MB;
+      const svg = document.createElementNS(NS, 'svg');
+      svg.setAttribute('width', W); svg.setAttribute('height', H);
+      svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+
+      // Compute per-round sliding window bit rates with time offsets
+      const allPoints = [];
+      let tOff = 0;
+      collectRounds.forEach(r => {
+        if (r.trials.length > 0) {
+          const rStart = r.trials[0].timestamp_ms - r.trials[0].rt_ms;
+          for (let i = 0; i < r.trials.length; i++) {
+            const tMs = r.trials[i].timestamp_ms;
+            const timeInRound = (tMs - rStart) / 1000;
+            const windowStartMs = tMs - 5000;
+            let rsc = 0, rsi = 0;
+            for (let j = 0; j <= i; j++) {
+              if (r.trials[j].timestamp_ms >= windowStartMs) {
+                if (r.trials[j].correct) rsc++; else rsi++;
+              }
+            }
+            const dur = Math.min(5, timeInRound);
+            const br = BitRateCalculator.compute(r.alphabet_size, rsc, rsi, Math.max(dur, 0.001));
+            allPoints.push({ time: tOff + timeInRound, br });
+          }
+        }
+        tOff += r.duration_s;
+      });
+
+      if (allPoints.length > 1) {
+        const maxBR = Math.max(1, ...allPoints.map(p => p.br)) * 1.15;
+        const sxFn = v => ML + v / totalDur * pw;
+        const syFn = v => MT + ph - v / maxBR * ph;
+
+        // Axes
+        const mkLine = (x1, y1, x2, y2, s, sw, da) => {
+          const l = document.createElementNS(NS, 'line');
+          l.setAttribute('x1', x1); l.setAttribute('y1', y1);
+          l.setAttribute('x2', x2); l.setAttribute('y2', y2);
+          l.setAttribute('stroke', s); l.setAttribute('stroke-width', sw);
+          if (da) l.setAttribute('stroke-dasharray', da);
+          svg.appendChild(l);
+        };
+        mkLine(ML, MT + ph, ML + pw, MT + ph, '#444', 1);
+        mkLine(ML, MT, ML, MT + ph, '#444', 1);
+
+        const mkText = (x, y, txt, anchor) => {
+          const t = document.createElementNS(NS, 'text');
+          t.setAttribute('x', x); t.setAttribute('y', y);
+          t.setAttribute('fill', '#666'); t.setAttribute('font-size', 11);
+          t.setAttribute('font-family', '-apple-system,sans-serif');
+          t.setAttribute('text-anchor', anchor || 'start');
+          t.textContent = txt; svg.appendChild(t);
+        };
+        mkText(ML, MT + ph + 18, '0s', 'start');
+        mkText(ML + pw, MT + ph + 18, totalDur + 's', 'end');
+        mkText(ML - 6, MT + ph, '0', 'end');
+        mkText(ML - 6, MT + 10, maxBR.toFixed(1), 'end');
+
+        const ptStr = allPoints.map(p => sxFn(p.time) + ',' + syFn(p.br)).join(' ');
+        const pl = document.createElementNS(NS, 'polyline');
+        pl.setAttribute('points', ptStr);
+        pl.setAttribute('fill', 'none');
+        pl.setAttribute('stroke', '#fff');
+        pl.setAttribute('stroke-width', '2');
+        svg.appendChild(pl);
+      }
+      chartContainer.appendChild(svg);
+    }
+
+    // Charts 4 & 5
+    ChartRenderer.renderBitRateVsN(c, collectRounds);
+    ChartRenderer.renderAccuracyVsN(c, collectRounds);
+  }
+
+  // Build collect round table
+  function buildCollectRoundTable() {
+    const container = document.getElementById('collect-round-rows');
+    container.innerHTML = '';
+    const table = document.createElement('table');
+    table.className = 'round-table';
+
+    const thead = document.createElement('thead');
+    thead.innerHTML = '<tr><th>Round</th><th>N</th><th>Sc</th><th>Si</th><th>Acc</th><th>bits/s</th><th>Eff</th></tr>';
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    const bestIdx = collectRounds.reduce((bi, r, i, arr) => r.bit_rate > arr[bi].bit_rate ? i : bi, 0);
+
+    collectRounds.forEach((r, i) => {
+      const tr = document.createElement('tr');
+      if (i === bestIdx) tr.className = 'best-row';
+      const total = r.sc + r.si;
+      const acc = total > 0 ? (100 * r.sc / total).toFixed(1) : '0.0';
+      const eff = total > 0 ? (100 * (2 * r.sc / total - 1)).toFixed(1) : '0.0';
+      tr.innerHTML =
+        '<td>R' + r.round + '</td>' +
+        '<td>' + r.alphabet_size + '</td>' +
+        '<td>' + r.sc + '</td>' +
+        '<td>' + r.si + '</td>' +
+        '<td>' + acc + '%</td>' +
+        '<td>' + r.bit_rate.toFixed(2) + '</td>' +
+        '<td>' + eff + '%</td>';
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    container.appendChild(table);
+  }
+
+  // Save current round data (called on COLLECT_GAME exit)
+  function saveRoundData() {
+    const total = sc + si;
+    const acc = total > 0 ? sc / total : 0;
+    const roundTrials = logger.trials.map(t => ({
+      ...t,
+      round: collectRoundIndex + 1,
+      alphabet_size: currentN,
+    }));
+    collectRounds.push({
+      round: collectRoundIndex + 1,
+      alphabet_size: currentN,
+      alphabet: [...alphabet],
+      duration_s: COLLECT_DURATION_S,
+      sc, si,
+      accuracy: acc,
+      bit_rate: BitRateCalculator.compute(currentN, sc, si, COLLECT_DURATION_S),
+      shenoy_efficiency: total > 0 ? 2 * acc - 1 : 0,
+      trials: roundTrials,
+    });
+    // Accumulate master trial log
+    roundTrials.forEach(t => {
+      masterTrials.push({ ...t, trial_number: masterTrials.length + 1 });
+    });
+  }
+
+  // ── Chord mode helpers ──
+
+  let chordQueue = [];
+  const chordLogger = new TrialLogger();
+  let chordSc = 0, chordSi = 0, chordStreak = 0;
+  let chordGameStartTime = 0, chordTargetShownTime = 0;
+  let lastInfoSummary = null;
+  let lastChordInfoSummary = null;
+
+  function renderChordPattern(symbolId, containerEl, dotSize, labelSize) {
+    containerEl.innerHTML = '';
+    const sym = ChordSymbols.symbols.find(s => s.id === symbolId);
+    if (!sym) return;
+    const row = document.createElement('div');
+    row.className = 'chord-pattern';
+    const allKeys = [...ChordSymbols.LEFT, ...ChordSymbols.RIGHT];
+    allKeys.forEach((k, i) => {
+      if (i === ChordSymbols.LEFT.length) {
+        const gap = document.createElement('div');
+        gap.className = 'chord-hand-gap';
+        row.appendChild(gap);
+      }
+      const dot = document.createElement('div');
+      dot.className = 'chord-dot' + (sym.keys.includes(k) ? ' active' : '');
+      dot.style.width = dotSize + 'px';
+      dot.style.height = dotSize + 'px';
+      row.appendChild(dot);
+    });
+    containerEl.appendChild(row);
+    const label = document.createElement('div');
+    label.className = 'chord-label';
+    label.style.fontSize = labelSize + 'px';
+    label.textContent = sym.id;
+    containerEl.appendChild(label);
+  }
+
+  function pickRandomChordTarget() {
+    return ChordSymbols.symbols[Math.floor(Math.random() * ChordSymbols.symbols.length)];
+  }
+
+  function initChordQueue() {
+    chordQueue = [];
+    for (let i = 0; i < 4; i++) chordQueue.push(pickRandomChordTarget());
+  }
+
+  function advanceChordQueue() {
+    chordQueue.shift();
+    chordQueue.push(pickRandomChordTarget());
+    chordTargetShownTime = performance.now();
+    renderChordQueue();
+    AudioFeedback.spatialCue(chordQueue[0].keys[0]);
+  }
+
+  function renderChordQueue() {
+    const targetEl = document.getElementById('chord-target');
+    renderChordPattern(chordQueue[0].id, targetEl, 28, 14);
+
+    const sizes = [
+      { dotSize: 18, opacity: 0.45, labelSize: 10 },
+      { dotSize: 14, opacity: 0.3, labelSize: 10 },
+      { dotSize: 12, opacity: 0.18, labelSize: 10 },
+    ];
+    for (let i = 0; i < 3; i++) {
+      const el = document.getElementById('chord-look-' + (i + 1));
+      renderChordPattern(chordQueue[i + 1].id, el, sizes[i].dotSize, sizes[i].labelSize);
+      el.style.opacity = sizes[i].opacity;
+    }
+  }
+
+  function updateChordStats(tElapsed) {
+    const remaining = Math.max(0, currentDuration - tElapsed);
+    document.getElementById('chord-timer').textContent = remaining.toFixed(1);
+    document.getElementById('chord-bitrate').textContent =
+      BitRateCalculator.compute(20, chordSc, chordSi, tElapsed).toFixed(2) + ' bits/s';
+    const total = chordSc + chordSi;
+    document.getElementById('chord-accuracy').textContent =
+      total > 0 ? (100 * chordSc / total).toFixed(1) + '%' : '\u2014';
+    document.getElementById('chord-counts').textContent = 'Sc: ' + chordSc + '   Si: ' + chordSi;
+    document.getElementById('chord-streak').textContent = 'Streak: ' + chordStreak;
+    const streakEl = document.getElementById('chord-streak');
+    streakEl.className = chordStreak >= 10 ? 'glow' : chordStreak >= 5 ? 'gold' : '';
+  }
+
+  function onChordResolved(sym, resolveTime) {
+    const rtMs = resolveTime - chordTargetShownTime;
+    const correct = sym.id === chordQueue[0].id;
+
+    if (correct) {
+      chordSc++; chordStreak++;
+      AudioFeedback.correct();
+      const targetEl = document.getElementById('chord-target');
+      targetEl.style.background = 'rgba(46,204,113,0.15)';
+      setTimeout(() => { targetEl.style.background = ''; }, 150);
+    } else {
+      chordSi++; chordStreak = 0;
+      AudioFeedback.incorrect();
+      const targetEl = document.getElementById('chord-target');
+      targetEl.style.background = 'rgba(231,76,60,0.15)';
+      setTimeout(() => { targetEl.style.background = ''; }, 200);
+    }
+
+    chordLogger.log(resolveTime, chordQueue[0].id, sym.id, correct, rtMs);
+    advanceChordQueue();
+  }
+
+  function buildChordJSON() {
+    const total = chordSc + chordSi;
+    const acc = total > 0 ? chordSc / total : 0;
+    const br = BitRateCalculator.compute(20, chordSc, chordSi, currentDuration);
+    const eff = total > 0 ? 2 * acc - 1 : 0;
+    const result = {
+      mode: 'chord',
+      timestamp: new Date().toISOString(),
+      alphabet_size: 20,
+      symbols: ChordSymbols.symbols.map(s => ({ id: s.id, keys: s.keys, hand: s.hand })),
+      duration_s: currentDuration,
+      sc: chordSc, si: chordSi,
+      accuracy: parseFloat(acc.toFixed(4)),
+      bit_rate: parseFloat(br.toFixed(2)),
+      shenoy_efficiency: parseFloat(Math.max(eff, 0).toFixed(4)),
+      trials: chordLogger.trials.map(t => ({ ...t })),
+    };
+    if (lastChordInfoSummary) {
+      result.information_theory = {
+        mutual_information_per_selection: parseFloat(lastChordInfoSummary.miPerSelection.toFixed(4)),
+        mi_throughput_bps: parseFloat(lastChordInfoSummary.miThroughput.toFixed(2)),
+        theoretical_max_bps: parseFloat(lastChordInfoSummary.theoreticalMax.toFixed(2)),
+        shenoy_efficiency: parseFloat(lastChordInfoSummary.shenoyEfficiency.toFixed(4)),
+        mi_efficiency: parseFloat(lastChordInfoSummary.miEfficiency.toFixed(4)),
+        bias_correction: parseFloat(lastChordInfoSummary.bias.toFixed(6)),
+      };
+    }
+    return result;
+  }
+
+  function onChordWelcomeKey(e) {
+    if (e.key === 'Enter') { e.preventDefault(); AudioFeedback.init(); transition('CHORD_COUNTDOWN'); }
+  }
+
+  function onChordResultsKey(e) {
+    if (e.key === 'Enter') { e.preventDefault(); transition('CHORD_WELCOME'); }
+  }
+
+  function onChordGameKeyDown(event) {
+    ChordDetector.handleKeyDown(event);
+  }
+
+  // ── State definitions ──
+
+  const states = {
+    // ── Normal mode states ──
+    WELCOME: {
+      enter() {
+        showScreen('welcome-screen');
+
+        // Settings controls
+        const skipCheck = document.getElementById('skip-calib-check');
+        const nGroup = document.getElementById('n-slider-group');
+        const nSlider = document.getElementById('settings-n-slider');
+        const nValue = document.getElementById('settings-n-value');
+        const durBtns = document.querySelectorAll('.duration-btn');
+
+        if (firstWelcome && MANUAL_N) {
+          skipCheck.checked = true;
+          nSlider.value = MANUAL_N;
+        } else {
+          skipCheck.checked = false;
+          nSlider.value = 26;
+        }
+        nGroup.classList.toggle('visible', skipCheck.checked);
+        nValue.textContent = 'N = ' + nSlider.value;
+        firstWelcome = false;
+
+        // Duration buttons
+        durBtns.forEach(btn => {
+          btn.classList.toggle('active', parseInt(btn.dataset.dur) === settingsDuration);
+        });
+
+        skipCheck.onchange = () => {
+          nGroup.classList.toggle('visible', skipCheck.checked);
+          buildKeycapDisplay();
+        };
+        nSlider.oninput = () => {
+          nValue.textContent = 'N = ' + nSlider.value;
+          buildKeycapDisplay();
+        };
+        durBtns.forEach(btn => {
+          btn.onclick = () => {
+            durBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            settingsDuration = parseInt(btn.dataset.dur);
+            buildKeycapDisplay();
+          };
+        });
+
+        buildKeycapDisplay();
+        const noteEl = document.getElementById('spatial-audio-note');
+        noteEl.textContent = AudioFeedback.isEnabled()
+          ? 'Spatial audio cues enabled \u2014 tones indicate key position'
+          : 'Audio muted';
+        document.addEventListener('keydown', onWelcomeKey);
+      },
+      exit() { document.removeEventListener('keydown', onWelcomeKey); },
+      update() {},
+    },
+
+    // ── Calibration states (normal mode only) ──
+    CALIBRATION_INTRO: {
+      enter() {
+        showScreen('calib-intro-screen');
+        calibRoundIndex = 0;
+        calibRounds = [];
+        calibFit = null;
+        calibBayes = null;
+        calibKeyStats = [];
+        optimizedAlphabet = null;
+        document.addEventListener('keydown', onCalibIntroKey);
+      },
+      exit() { document.removeEventListener('keydown', onCalibIntroKey); },
+      update() {},
+    },
+
+    CALIB_COUNTDOWN: {
+      enter() { runCountdown('CALIB_ROUND'); },
+      exit() {},
+      update() {},
+    },
+
+    CALIB_ROUND: {
+      enter() {
+        currentN = CALIB_N_VALUES[calibRoundIndex];
+        currentDuration = CALIB_DURATION_S;
+        roundIndicator.style.display = '';
+        if (calibRoundIndex === 2) {
+          roundIndicator.textContent = 'CALIBRATION Round 3/3 \u00B7 Edge keys (N=' + currentN + ')';
+          optimizedAlphabet = CALIB_EDGE_KEYS;
+        } else {
+          roundIndicator.textContent = 'CALIBRATION Round ' + (calibRoundIndex + 1) + '/3 \u00B7 N=' + currentN;
+          optimizedAlphabet = null;
+        }
+        enterGame();
+        if (calibRoundIndex === 2) optimizedAlphabet = null;
+      },
+      exit() {
+        exitGame();
+        roundIndicator.style.display = 'none';
+        saveCalibRound();
+      },
+      update() {
+        const t = (performance.now() - gameStartTime) / 1000;
+        if (t >= currentDuration) {
+          updateStatsDisplay(currentDuration);
+          if (calibRoundIndex < CALIB_N_VALUES.length - 1) {
+            transition('CALIB_REST');
+          } else {
+            transition('CALIB_RECOMMEND');
+          }
+          return;
+        }
+        updateStatsDisplay(t);
+      },
+    },
+
+    CALIB_REST: {
+      _interval: null,
+      enter() {
+        showScreen('calib-rest-screen');
+        const lastRound = calibRounds[calibRoundIndex];
+        document.getElementById('calib-rest-title').textContent =
+          'Round ' + (calibRoundIndex + 1) + '/3 complete';
+        document.getElementById('calib-rest-stats').textContent =
+          'Bit rate: ' + lastRound.bit_rate.toFixed(2) + ' bits/s \u00B7 Accuracy: ' +
+          (100 * lastRound.accuracy).toFixed(1) + '%';
+        const nextN = CALIB_N_VALUES[calibRoundIndex + 1];
+        document.getElementById('calib-rest-next').textContent = 'Next round: N = ' + nextN + ' keys';
+
+        let remaining = CALIB_REST_S;
+        const cdEl = document.getElementById('calib-rest-cd');
+        cdEl.textContent = remaining;
+        this._interval = setInterval(() => {
+          remaining--;
+          if (remaining <= 0) {
+            clearInterval(this._interval);
+            this._interval = null;
+            calibRoundIndex++;
+            transition('CALIB_COUNTDOWN');
+          } else {
+            cdEl.textContent = remaining;
+          }
+        }, 1000);
+      },
+      exit() {
+        if (this._interval) { clearInterval(this._interval); this._interval = null; }
+      },
+      update() {},
+    },
+
+    CALIB_RECOMMEND: {
+      enter() {
+        showScreen('calib-recommend-screen');
+
+        // Only fit model from rounds 1-2 (general keys). Round 3 (edge keys) has
+        // systematically different RT/accuracy and would bias the Hick-Hyman slope.
+        const modelRounds = calibRounds.filter((_, i) => i < 2);
+        calibFit = CalibrationFitter.fit(modelRounds);
+        calibBayes = CalibrationFitter.fitAccuracyBayes(modelRounds, calibFit.a, calibFit.b);
+        modelRecommendedN = calibFit.recommended_n;
+        recommendedN = modelRecommendedN;
+        selectedN = recommendedN;
+        console.log('[CalibRecommend] Model recommended N=' + modelRecommendedN + ' fallback=' + calibFit.fallback);
+
+        // Per-key stats & optimized alphabet
+        calibKeyStats = computePerKeyStats();
+        optimizedAlphabet = KeySubsetSelector.getOptimalKeySubset(recommendedN, calibKeyStats);
+        console.log('[CalibRecommend] Initial alphabet (N=' + optimizedAlphabet.length + '): ' + optimizedAlphabet.join(','));
+
+        // Greedy pruning: remove keys that hurt throughput
+        optimizedAlphabet = pruneAlphabet(optimizedAlphabet, calibKeyStats);
+        recommendedN = optimizedAlphabet.length;
+        console.log('[CalibRecommend] After pruning N=' + recommendedN + ' alphabet: ' + optimizedAlphabet.join(','));
+        selectedN = recommendedN;
+
+        // Display recommendation
+        const statsMap = new Map(calibKeyStats.map(s => [s.key, s]));
+        const prunedBR = computeAlphabetBitRate(optimizedAlphabet, statsMap);
+        const recNEl = document.getElementById('calib-rec-n');
+        let displayN = 3;
+        const countInterval = setInterval(() => {
+          displayN++;
+          recNEl.textContent = 'N = ' + displayN;
+          if (displayN >= recommendedN) {
+            clearInterval(countInterval);
+            recNEl.textContent = 'N = ' + recommendedN;
+            recNEl.style.animation = 'none';
+            void recNEl.offsetWidth;
+            recNEl.style.animation = 'streak-pop 300ms ease-out';
+          }
+        }, 40);
+        document.getElementById('calib-rec-br').textContent =
+          'Estimated bit rate: ' + prunedBR.toFixed(2) + ' bits/s';
+
+        // Fit quality note
+        const noteEl = document.getElementById('calib-rec-note');
+        if (calibFit.fallback) {
+          noteEl.textContent = 'Calibration model fit produced low confidence \u2014 using highest-bit-rate calibration round as recommendation.';
+          noteEl.style.cssText = 'color: #e74c3c; font-size: 13px;';
+        } else {
+          noteEl.textContent = 'Model fit from rounds 1-2 (edge-key round used for per-key analysis only)';
+          noteEl.style.cssText = 'color: #888; font-size: 13px;';
+        }
+
+        const prunedCount = modelRecommendedN - recommendedN;
+        if (prunedCount > 0) {
+          const prunedNote = document.createElement('div');
+          prunedNote.style.cssText = 'font-size:13px;color:#e67e22;margin-top:4px;';
+          prunedNote.textContent = prunedCount + ' key' + (prunedCount > 1 ? 's' : '') +
+            ' excluded by per-key break-even analysis';
+          noteEl.after(prunedNote);
+        }
+
+        // Calibration summary rows
+        const summaryEl = document.getElementById('calib-round-summary');
+        summaryEl.innerHTML = '';
+        calibRounds.forEach(r => {
+          const row = document.createElement('div');
+          row.className = 'result-row';
+          row.innerHTML = '<span class="label">N=' + r.n + '</span>' +
+            '<span class="value">' + r.bit_rate.toFixed(2) + ' bits/s, ' +
+            (100 * r.accuracy).toFixed(1) + '% accuracy</span>';
+          summaryEl.appendChild(row);
+        });
+
+        // Fitted parameters
+        document.getElementById('calib-fit-params').innerHTML =
+          'Hick\u2019s Law: RT = ' + Math.round(calibFit.a * 1000) + ' + ' +
+          Math.round(calibFit.b * 1000) + ' \u00D7 log\u2082(N) ms<br>' +
+          'Accuracy: p = ' + calibFit.p0.toFixed(3) + ' \u2212 ' + calibFit.c.toFixed(3) + ' \u00D7 log\u2082(N)';
+
+        // Chart
+        const chartContainer = document.getElementById('calib-chart-container');
+        chartContainer.innerHTML = '';
+        ChartRenderer.renderCalibChart(chartContainer, calibFit.curve, calibRounds, recommendedN);
+        document.getElementById('calib-chart-note').textContent =
+          'Alphabet personalized based on per-key performance';
+
+        // Optimized alphabet display
+        function updateCalibKeycaps(n) {
+          const opt = KeySubsetSelector.getOptimalKeySubset(n, calibKeyStats);
+          optimizedAlphabet = opt;
+          const kcRow = document.getElementById('calib-keycap-display');
+          kcRow.innerHTML = '';
+          opt.forEach(k => {
+            const d = document.createElement('div');
+            d.className = 'keycap' + (k === 'SPACE' ? ' keycap-space' : '');
+      d.textContent = displayKey(k);
+            kcRow.appendChild(d);
+          });
+          // Excluded keys
+          const full = KeySubsetSelector.getKeySubset(32);
+          const optSet = new Set(opt);
+          const excluded = full.filter(k => !optSet.has(k));
+          const exEl = document.getElementById('calib-excluded');
+          if (excluded.length > 0 && n < 32) {
+            exEl.textContent = 'Excluded: ' + excluded.map(displayKey).join(', ');
+          } else {
+            exEl.textContent = '';
+          }
+          updateEdgeTradeoffs(n, opt);
+        }
+
+        // Edge key break-even analysis: per-key B(N+1,with) vs B(N,without)
+        function updateEdgeTradeoffs(n, opt) {
+          const container = document.getElementById('calib-edge-tradeoffs');
+          container.innerHTML = '';
+          if (!calibKeyStats.length || n < 4) return;
+
+          const statsMap = new Map();
+          calibKeyStats.forEach(s => statsMap.set(s.key, s));
+
+          // Aggregate RT and accuracy for the current optimal set
+          const optStats = opt.map(k => statsMap.get(k)).filter(s => s && s.attempts >= 1);
+          if (optStats.length === 0) return;
+
+          const totalAttempts = optStats.reduce((s, k) => s + k.attempts, 0);
+          const totalCorrect = optStats.reduce((s, k) => s + k.correct, 0);
+          const weightedRT = optStats.reduce((s, k) => s + k.mean_rt_ms * k.attempts, 0) / totalAttempts;
+          const weightedAcc = totalAttempts > 0 ? totalCorrect / totalAttempts : 1;
+
+          // B_without: bit rate with current N keys
+          const rWithout = 1000 / weightedRT;
+          const bWithout = Math.log2(n - 1) * rWithout * Math.max(2 * weightedAcc - 1, 0);
+
+          // For each edge key NOT in the optimal set, compute break-even
+          const optSet = new Set(opt);
+          const rows = [];
+          CALIB_EDGE_KEYS.forEach(key => {
+            if (optSet.has(key)) return;
+            const s = statsMap.get(key);
+            if (!s || s.attempts < 1) return;
+
+            const newTotalAttempts = totalAttempts + s.attempts;
+            const newTotalCorrect = totalCorrect + s.correct;
+            const newWeightedRT = (weightedRT * totalAttempts + s.mean_rt_ms * s.attempts) / newTotalAttempts;
+            const newWeightedAcc = newTotalCorrect / newTotalAttempts;
+
+            const rWith = 1000 / newWeightedRT;
+            const bWith = Math.log2(n) * rWith * Math.max(2 * newWeightedAcc - 1, 0);
+
+            const delta = bWith - bWithout;
+            const rtCost = s.mean_rt_ms - weightedRT;
+
+            rows.push({ key, keyRT: s.mean_rt_ms, keyAcc: s.accuracy, rtCost, delta });
+          });
+
+          if (rows.length === 0) return;
+
+          rows.sort((a, b) => b.delta - a.delta);
+
+          const title = document.createElement('div');
+          title.textContent = 'Edge Key Break-Even Analysis';
+          title.style.cssText = 'font-size: 14px; color: #888; margin-top: 12px; margin-bottom: 4px;';
+          container.appendChild(title);
+
+          const header = document.createElement('div');
+          header.style.cssText = 'font-size: 11px; color: #666; margin-bottom: 2px;';
+          header.textContent = 'B(N+1, with key) vs B(N, without): net change in bps';
+          container.appendChild(header);
+
+          rows.forEach(r => {
+            const row = document.createElement('div');
+            const color = r.delta > 0 ? '#2ecc71' : '#e74c3c';
+            const sign = r.delta >= 0 ? '+' : '';
+            row.style.cssText = 'font-family:"SF Mono","Fira Code","Cascadia Code","Consolas",monospace;font-size:12px;color:' + color + ';padding:1px 0;';
+            row.textContent = displayKey(r.key) + ': ' +
+              sign + r.delta.toFixed(2) + ' bps  ' +
+              '(RT ' + r.keyRT.toFixed(0) + 'ms, acc ' + (100 * r.keyAcc).toFixed(0) + '%, ' +
+              (r.rtCost >= 0 ? '+' : '') + r.rtCost.toFixed(0) + 'ms vs avg)';
+            container.appendChild(row);
+          });
+        }
+
+        updateCalibKeycaps(recommendedN);
+
+        // Slider
+        const slider = document.getElementById('calib-slider');
+        const sliderLabel = document.getElementById('calib-slider-label');
+        const sliderBR = document.getElementById('calib-slider-br');
+        slider.value = recommendedN;
+        sliderLabel.textContent = 'N = ' + recommendedN;
+        sliderBR.textContent = 'Estimated: ' + prunedBR.toFixed(2) + ' bits/s';
+
+        slider.oninput = () => {
+          const n = parseInt(slider.value);
+          selectedN = n;
+          sliderLabel.textContent = 'N = ' + n;
+          sliderBR.textContent = 'Estimated: ' + CalibrationFitter.predictBR(calibFit, n).toFixed(2) + ' bits/s';
+          updateCalibKeycaps(n);
+        };
+
+        // Start button + Enter
+        document.getElementById('calib-start-btn').textContent = 'Start Scored Run (' + settingsDuration + 's)';
+        document.getElementById('calib-start-btn').onclick = () => transition('COUNTDOWN');
+        document.addEventListener('keydown', onCalibRecommendKey);
+      },
+      exit() { document.removeEventListener('keydown', onCalibRecommendKey); },
+      update() {},
+    },
+
+    COUNTDOWN: {
+      enter() { runCountdown('GAME'); },
+      exit() {},
+      update() {},
+    },
+
+    GAME: {
+      enter() {
+        currentN = selectedN;
+        currentDuration = settingsDuration;
+        roundIndicator.style.display = 'none';
+        enterGame();
+      },
+      exit() { exitGame(); },
+      update() {
+        const t = (performance.now() - gameStartTime) / 1000;
+        if (t >= currentDuration) {
+          updateStatsDisplay(currentDuration);
+          transition('RESULTS');
+          return;
+        }
+        updateStatsDisplay(t);
+      },
+    },
+
+    RESULTS: {
+      enter() {
+        showScreen('results-screen');
+
+        const total = sc + si;
+        const acc = total > 0 ? sc / total : 0;
+        const br = BitRateCalculator.compute(currentN, sc, si, currentDuration);
+        const eff = total > 0 ? 2 * acc - 1 : 0;
+
+        // Confetti scaled by bit rate
+        const confettiCount = Math.min(120, Math.max(20, Math.round(br * 8)));
+        spawnConfetti(confettiCount);
+
+        document.getElementById('result-bitrate').innerHTML =
+          br.toFixed(2) + ' <span class="result-unit">bits/s</span>';
+        document.getElementById('result-n').textContent = currentN +
+          (calibFit && selectedN !== recommendedN ? ' (recommended: ' + recommendedN + ')' : '');
+        document.getElementById('result-sc').textContent = sc;
+        document.getElementById('result-si').textContent = si;
+        document.getElementById('result-total').textContent = total;
+        document.getElementById('result-accuracy').textContent =
+          total > 0 ? (100 * acc).toFixed(1) + '%' : '\u2014';
+        document.getElementById('result-duration').textContent = currentDuration.toFixed(1) + 's';
+        document.getElementById('result-efficiency').textContent =
+          (100 * Math.max(eff, 0)).toFixed(1) + '%';
+
+        // Personal best
+        const storageKey = 'bitrate_personal_best';
+        let prevBest = 0;
+        try { prevBest = parseFloat(localStorage.getItem(storageKey) || '0'); } catch (e) {}
+        const isNewBest = br > prevBest && currentDuration >= 30;
+        if (isNewBest) {
+          try { localStorage.setItem(storageKey, br.toFixed(2)); } catch (e) {}
+          const brEl = document.getElementById('result-bitrate');
+          brEl.style.animation = 'none';
+          void brEl.offsetWidth;
+          brEl.style.animation = 'streak-pop 400ms ease-out';
+          brEl.style.color = '#f1c40f';
+          setTimeout(() => { brEl.style.color = ''; }, 2000);
+        }
+        const pbRow = document.createElement('div');
+        pbRow.className = 'result-row';
+        const bestVal = Math.max(prevBest, br);
+        pbRow.innerHTML = '<span class="label">Personal best</span><span class="value" style="' +
+          (isNewBest ? 'color:#f1c40f;' : '') + '">' +
+          (isNewBest ? br.toFixed(2) + ' NEW!' : bestVal.toFixed(2)) +
+          ' bits/s</span>';
+        const effRow = document.getElementById('result-efficiency').closest('.result-row');
+        if (effRow) effRow.after(pbRow);
+
+        renderNormalAnalytics();
+        renderErrorPatterns('error-patterns', logger.trials);
+
+        // Export buttons
+        const data = buildNormalJSON();
+        const jsonStr = JSON.stringify(data, null, 2);
+        document.getElementById('btn-copy-json').onclick = function () {
+          DataExporter.copyJSON(jsonStr, this);
+        };
+        document.getElementById('btn-download-json').onclick = () => {
+          DataExporter.downloadJSON(data, DataExporter.makeFilename('normal'));
+        };
+
+        document.addEventListener('keydown', onResultsKey);
+        console.log('Trial log length:', logger.length);
+      },
+      exit() { document.removeEventListener('keydown', onResultsKey); },
+      update() {},
+    },
+
+    // ── Collect mode states ──
+    PARTICIPANT_ID: {
+      enter() {
+        showScreen('participant-screen');
+        collectRoundIndex = 0;
+        collectRounds = [];
+        masterTrials = [];
+        participantInput.value = '';
+        setTimeout(() => participantInput.focus(), 50);
+        document.getElementById('participant-start').onclick = onParticipantStart;
+        participantInput.addEventListener('keydown', onParticipantKey);
+      },
+      exit() {
+        participantInput.removeEventListener('keydown', onParticipantKey);
+      },
+      update() {},
+    },
+
+    COLLECT_COUNTDOWN: {
+      enter() { runCountdown('COLLECT_GAME'); },
+      exit() {},
+      update() {},
+    },
+
+    COLLECT_GAME: {
+      enter() {
+        currentN = COLLECT_N_VALUES[collectRoundIndex];
+        currentDuration = COLLECT_DURATION_S;
+        roundIndicator.style.display = '';
+        roundIndicator.textContent = 'Round ' + (collectRoundIndex + 1) + '/6 \u00B7 N=' + currentN;
+        enterGame();
+      },
+      exit() {
+        exitGame();
+        roundIndicator.style.display = 'none';
+        saveRoundData();
+      },
+      update() {
+        const t = (performance.now() - gameStartTime) / 1000;
+        if (t >= currentDuration) {
+          updateStatsDisplay(currentDuration);
+          if (collectRoundIndex < COLLECT_N_VALUES.length - 1) {
+            transition('COLLECT_REST');
+          } else {
+            transition('COLLECT_RESULTS');
+          }
+          return;
+        }
+        updateStatsDisplay(t);
+      },
+    },
+
+    COLLECT_REST: {
+      _interval: null,
+      enter() {
+        showScreen('collect-rest-screen');
+        const nextIdx = collectRoundIndex + 1;
+        const nextN = COLLECT_N_VALUES[nextIdx];
+        document.getElementById('rest-title').textContent =
+          'Round ' + (collectRoundIndex + 1) + '/6 complete';
+        document.getElementById('rest-next').textContent = 'Next: N=' + nextN + ' keys';
+
+        let remaining = COLLECT_REST_S;
+        const cdEl = document.getElementById('rest-countdown');
+        cdEl.textContent = 'Rest... ' + remaining;
+
+        this._interval = setInterval(() => {
+          remaining--;
+          if (remaining <= 0) {
+            clearInterval(this._interval);
+            this._interval = null;
+            collectRoundIndex++;
+            transition('COLLECT_COUNTDOWN');
+          } else {
+            cdEl.textContent = 'Rest... ' + remaining;
+          }
+        }, 1000);
+      },
+      exit() {
+        if (this._interval) { clearInterval(this._interval); this._interval = null; }
+      },
+      update() {},
+    },
+
+    COLLECT_RESULTS: {
+      enter() {
+        showScreen('collect-results-screen');
+
+
+        if (collectRounds.length > 0) {
+          const best = collectRounds.reduce((a, b) => a.bit_rate > b.bit_rate ? a : b);
+          document.getElementById('collect-best-br').innerHTML =
+            best.bit_rate.toFixed(2) + ' <span class="result-unit">bits/s</span>';
+          document.getElementById('collect-best-info').textContent =
+            'Optimal N = ' + best.alphabet_size + ' (Round ' + best.round + ')';
+        }
+
+        buildCollectRoundTable();
+        renderCollectAnalytics();
+        renderErrorPatterns('collect-error-patterns', masterTrials);
+
+        // Export buttons
+        const data = buildCollectJSON();
+        const jsonStr = JSON.stringify(data, null, 2);
+        document.getElementById('btn-collect-copy').onclick = function () {
+          DataExporter.copyJSON(jsonStr, this);
+        };
+        document.getElementById('btn-collect-download').onclick = () => {
+          DataExporter.downloadJSON(data, DataExporter.makeFilename('collect', participantId));
+        };
+
+        document.addEventListener('keydown', onCollectResultsKey);
+        console.log('Collect rounds:', collectRounds.length, 'Total trials:', masterTrials.length);
+      },
+      exit() { document.removeEventListener('keydown', onCollectResultsKey); },
+      update() {},
+    },
+
+    // ── Chord mode states ──
+    CHORD_WELCOME: {
+      enter() {
+        showScreen('chord-welcome-screen');
+        // Populate legend grid
+        const legend = document.getElementById('chord-legend');
+        legend.innerHTML = '';
+        const leftTitle = document.createElement('div');
+        leftTitle.className = 'chord-legend-title';
+        leftTitle.textContent = 'Left hand';
+        legend.appendChild(leftTitle);
+        ChordSymbols.symbols.filter(s => s.hand === 'left').forEach(s => {
+          const item = document.createElement('div');
+          item.className = 'chord-legend-item';
+          renderChordPattern(s.id, item, 10, 9);
+          legend.appendChild(item);
+        });
+        const rightTitle = document.createElement('div');
+        rightTitle.className = 'chord-legend-title';
+        rightTitle.textContent = 'Right hand';
+        legend.appendChild(rightTitle);
+        ChordSymbols.symbols.filter(s => s.hand === 'right').forEach(s => {
+          const item = document.createElement('div');
+          item.className = 'chord-legend-item';
+          renderChordPattern(s.id, item, 10, 9);
+          legend.appendChild(item);
+        });
+        document.addEventListener('keydown', onChordWelcomeKey);
+      },
+      exit() { document.removeEventListener('keydown', onChordWelcomeKey); },
+      update() {},
+    },
+
+    CHORD_COUNTDOWN: {
+      enter() { runCountdown('CHORD_GAME'); },
+      exit() {},
+      update() {},
+    },
+
+    CHORD_GAME: {
+      enter() {
+        showScreen('chord-game-screen');
+        currentN = 20;
+        currentDuration = 60;
+        chordSc = 0; chordSi = 0; chordStreak = 0;
+        chordLogger.trials.length = 0;
+        initChordQueue();
+        renderChordQueue();
+        ChordDetector.init(onChordResolved);
+        document.addEventListener('keydown', onChordGameKeyDown);
+        chordGameStartTime = performance.now();
+        chordTargetShownTime = chordGameStartTime;
+        gameStartTime = chordGameStartTime;
+        updateChordStats(0);
+        AudioFeedback.spatialCue(chordQueue[0].keys[0]);
+      },
+      exit() {
+        ChordDetector.cleanup();
+        document.removeEventListener('keydown', onChordGameKeyDown);
+      },
+      update() {
+        const t = (performance.now() - chordGameStartTime) / 1000;
+        if (t >= currentDuration) {
+          updateChordStats(currentDuration);
+          transition('CHORD_RESULTS');
+          return;
+        }
+        updateChordStats(t);
+      },
+    },
+
+    CHORD_RESULTS: {
+      enter() {
+        showScreen('chord-results-screen');
+        const total = chordSc + chordSi;
+        const acc = total > 0 ? chordSc / total : 0;
+        const br = BitRateCalculator.compute(20, chordSc, chordSi, currentDuration);
+        const eff = total > 0 ? 2 * acc - 1 : 0;
+
+        // Confetti scaled by bit rate
+        const confettiCount = Math.min(120, Math.max(20, Math.round(br * 8)));
+        spawnConfetti(confettiCount);
+
+        document.getElementById('chord-result-bitrate').innerHTML =
+          br.toFixed(2) + ' <span class="result-unit">bits/s</span>';
+        document.getElementById('chord-result-n').textContent = '20';
+        document.getElementById('chord-result-sc').textContent = chordSc;
+        document.getElementById('chord-result-si').textContent = chordSi;
+        document.getElementById('chord-result-total').textContent = total;
+        document.getElementById('chord-result-accuracy').textContent =
+          total > 0 ? (100 * acc).toFixed(1) + '%' : '\u2014';
+        document.getElementById('chord-result-duration').textContent = currentDuration.toFixed(1) + 's';
+        document.getElementById('chord-result-efficiency').textContent =
+          (100 * Math.max(eff, 0)).toFixed(1) + '%';
+
+        // Analytics charts
+        const cAnalytics = document.getElementById('chord-analytics');
+        cAnalytics.innerHTML = '';
+        ChartRenderer.renderRTChart(cAnalytics, chordLogger.trials);
+        ChartRenderer.renderAccuracyChart(cAnalytics, chordLogger.trials);
+        ChartRenderer.renderBitRateChart(cAnalytics, chordLogger.trials, 20, chordGameStartTime, currentDuration);
+
+        // Information-theoretic analysis
+        const chordAlphabet = ChordSymbols.symbols.map(s => s.id);
+        lastChordInfoSummary = InfoTheory.throughputSummary(
+          chordLogger.trials, chordAlphabet, currentDuration, 20, chordSc, chordSi
+        );
+        ChartRenderer.renderConfusionMatrix(cAnalytics, lastChordInfoSummary);
+        ChartRenderer.renderThroughputComparison(cAnalytics, lastChordInfoSummary);
+
+        // Speed-accuracy operating point
+        const chordTotal = chordSc + chordSi;
+        const chordSelPerSec = chordTotal / currentDuration;
+        const chordFinalAcc = chordTotal > 0 ? chordSc / chordTotal : 1;
+        ChartRenderer.renderSpeedAccuracyDot(cAnalytics, chordSelPerSec, chordFinalAcc, 20, br);
+
+        const data = buildChordJSON();
+        const jsonStr = JSON.stringify(data, null, 2);
+        document.getElementById('btn-chord-copy').onclick = function () {
+          DataExporter.copyJSON(jsonStr, this);
+        };
+        document.getElementById('btn-chord-download').onclick = () => {
+          DataExporter.downloadJSON(data, DataExporter.makeFilename('chord'));
+        };
+
+        document.addEventListener('keydown', onChordResultsKey);
+      },
+      exit() { document.removeEventListener('keydown', onChordResultsKey); },
+      update() {},
+    },
+  };
+
+  // ── Keydown handlers ──
+
+  function onWelcomeKey(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      AudioFeedback.init();
+      const skipCheck = document.getElementById('skip-calib-check');
+      if (skipCheck.checked) {
+        selectedN = parseInt(document.getElementById('settings-n-slider').value);
+        skippedCalibration = true;
+        transition('COUNTDOWN');
+      } else {
+        skippedCalibration = false;
+        transition('CALIBRATION_INTRO');
+      }
+    }
+  }
+  function onCalibIntroKey(e) {
+    if (e.key === 'Enter') { e.preventDefault(); transition('CALIB_COUNTDOWN'); }
+  }
+  function onCalibRecommendKey(e) {
+    if (e.key === 'Enter') { e.preventDefault(); transition('COUNTDOWN'); }
+  }
+  function onResultsKey(e) {
+    if (e.key === 'Enter') { e.preventDefault(); transition('WELCOME'); }
+  }
+  function onCollectResultsKey(e) {
+    if (e.key === 'Enter') { e.preventDefault(); transition('PARTICIPANT_ID'); }
+  }
+  function onParticipantStart() {
+    const id = participantInput.value.trim();
+    if (!id) { participantInput.focus(); return; }
+    participantId = id;
+    AudioFeedback.init();
+    transition('COLLECT_COUNTDOWN');
+  }
+  function onParticipantKey(e) {
+    if (e.key === 'Enter') { e.preventDefault(); onParticipantStart(); }
+  }
+
+  function onGameKeyDown(event) {
+    if (event.code === 'Space' || event.key === '/') event.preventDefault();
+    if (inputFrozen) return;
+    if (event.repeat) return;
+    const key = KeyNormalizer.getKeyFromEvent(event);
+
+    if (!alphabet.includes(key)) {
+      if (key.length === 1 && key !== ' ') flashTarget('flash-invalid', 100);
+      return;
+    }
+    event.preventDefault();
+
+    const now = performance.now();
+    const rtMs = now - targetShownTime;
+    const correct = key === targetQueue[0];
+
+    if (correct) { sc++; streak++; flashTarget('flash-correct', 150); }
+    else { si++; streak = 0; flashTarget('flash-incorrect', 200); }
+
+    updateStreakDisplay();
+    logger.log(now, targetQueue[0], key, correct, rtMs);
+
+    if (!correct && (currentState === 'GAME' || currentState === 'COLLECT_GAME') && detectPhaseShift()) {
+      triggerResync();
+      return;
+    }
+    advanceQueue();
+    updateMomentum();
+  }
+
+  // ── State machine ──
+
+  function transition(newState) {
+    if (currentState && states[currentState]) states[currentState].exit();
+    currentState = newState;
+    states[currentState].enter();
+
+    // Manage rAF loop: only run during active game states
+    if (newState === 'GAME' || newState === 'COLLECT_GAME' || newState === 'CALIB_ROUND' || newState === 'CHORD_GAME') {
+      if (rafId === null) rafId = requestAnimationFrame(loop);
+    } else if (rafId !== null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+  }
+
+  function loop() {
+    if (currentState && states[currentState]) states[currentState].update();
+    if (rafId !== null) rafId = requestAnimationFrame(loop);
+  }
+
+  return {
+    start() { transition(IS_COLLECT ? 'PARTICIPANT_ID' : IS_CHORD ? 'CHORD_WELCOME' : 'WELCOME'); },
+  };
+})();
+
+
+// ─────────────────────────────────────────────────────────────────────
+// Boot
+// ─────────────────────────────────────────────────────────────────────
+GameState.start();
+</script>
+</body>
+</html>
