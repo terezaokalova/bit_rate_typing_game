@@ -1,6 +1,7 @@
-.claude/
 .DS_Store
 __pycache__/
 *.pyc
 .vscode/
 .idea/
+# local tooling
+.*cache/
