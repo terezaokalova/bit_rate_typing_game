@@ -308,7 +308,8 @@ def plot_panel_bitrate(results: Dict[str, SimResult],
                       lw=2.5, alpha_band=0.10)
 
     _style_axes(ax, "Bit Rate vs Alphabet Size \u2014 Panel Members (Linear Model)")
-    ax.legend(loc="upper right", framealpha=0.9, fontsize=10)
+    ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.5),
+              fontsize=10, frameon=False)
     fig.tight_layout()
     fig.savefig(FIGURE_DIR / "bitrate_vs_n_panel.png", dpi=300, bbox_inches="tight")
     plt.close(fig)
@@ -327,7 +328,8 @@ def plot_all_agents(results: Dict[str, SimResult],
                       lw=2.5, alpha_band=0.10)
 
     _style_axes(ax, "Bit Rate vs Alphabet Size \u2014 All Agents (Linear Model)")
-    ax.legend(loc="upper right", framealpha=0.9, fontsize=10, ncol=2)
+    ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.5),
+              framealpha=0.9, fontsize=10, frameon=False)
     fig.tight_layout()
     fig.savefig(FIGURE_DIR / "bitrate_vs_n_all_agents.png", dpi=300, bbox_inches="tight")
     plt.close(fig)
@@ -354,7 +356,8 @@ def plot_linear_vs_logistic(panel_result: SimResult) -> None:
                alpha=0.6, linewidth=1.0)
 
     _style_axes(ax, "Panel Average: Linear vs Logistic Accuracy Model")
-    ax.legend(loc="upper right", framealpha=0.9, fontsize=11)
+    ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.5),
+              fontsize=11, frameon=False)
     fig.tight_layout()
     fig.savefig(FIGURE_DIR / "linear_vs_logistic.png", dpi=300, bbox_inches="tight")
     plt.close(fig)
