@@ -26,7 +26,7 @@
   }
   .screen.active { display: flex; }
 
-  /* ── Welcome screen ── */
+  /* Welcome screen */
   #welcome-screen { gap: 32px; }
   #welcome-screen h1 {
     font-size: 42px; font-weight: 800;
@@ -67,7 +67,7 @@
     50% { opacity: 1; }
   }
 
-  /* ── Name screen ── */
+  /* Name screen */
   #participant-screen { gap: 24px; }
   #participant-screen h1 { font-size: 32px; font-weight: 700; }
   #participant-input {
@@ -81,7 +81,7 @@
   #participant-input:focus { border-color: rgba(255,255,255,0.4); }
   #participant-input::placeholder { color: #555; }
 
-  /* ── Countdown screen ── */
+  /* Countdown screen */
   #countdown-screen { justify-content: center; }
   #countdown-char {
     font-size: 140px; font-weight: 800; color: #fff;
@@ -92,7 +92,7 @@
     to   { opacity: 1; transform: scale(1); }
   }
 
-  /* ── Game screen ── */
+  /* Game screen */
   #game-screen { gap: 24px; }
   #round-indicator {
     font-size: 15px; color: #888;
@@ -157,13 +157,13 @@
   #streak.gold { color: #f1c40f; }
   #streak.glow { color: #f1c40f; text-shadow: 0 0 12px rgba(241,196,15,0.4); }
 
-  /* ── Collect rest screen ── */
+  /* Collect rest screen */
   #collect-rest-screen { gap: 16px; justify-content: center; }
   #rest-title { font-size: 28px; font-weight: 600; }
   #rest-next { font-size: 20px; color: #aaa; }
   #rest-countdown { font-size: 64px; font-weight: 700; margin-top: 16px; }
 
-  /* ── Results screens ── */
+  /* Results screens─ */
   #results-screen, #collect-results-screen {
     gap: 16px; max-width: 800px; padding: 40px 20px;
   }
@@ -183,7 +183,7 @@
   }
   .result-unit { font-size: 22px; color: #888; font-weight: 400; }
 
-  /* ── Export buttons ── */
+  /* Export buttons */
   .export-buttons {
     display: flex; gap: 12px; margin-top: 16px;
   }
@@ -196,7 +196,7 @@
   }
   .export-btn:hover { background: rgba(255,255,255,0.12); }
 
-  /* ── Analytics charts ── */
+  /* Analytics charts */
   .analytics-container {
     display: flex; flex-wrap: wrap;
     justify-content: center; gap: 20px;
@@ -215,7 +215,7 @@
     margin-bottom: 4px; text-align: center;
   }
 
-  /* ── Collect round table ── */
+  /* Collect round table */
   .round-table {
     width: 100%; border-collapse: collapse;
     font-size: 14px; margin: 8px 0;
@@ -234,7 +234,7 @@
   .round-table td:first-child { text-align: left; color: #aaa; }
   .round-table .best-row td { color: #f1c40f; }
 
-  /* ── Audio toggle ── */
+  /* Audio toggle */
   #audio-toggle {
     position: fixed; top: 16px; right: 16px;
     width: 32px; height: 32px;
@@ -248,7 +248,7 @@
   }
   #audio-toggle:hover svg { fill: rgba(255,255,255,0.6); }
 
-  /* ── Calibration screens ── */
+  /* Calibration screens */
   #calib-intro-screen { gap: 32px; }
   #calib-intro-screen h1 { font-size: 36px; font-weight: 700; }
 
@@ -297,7 +297,7 @@
   }
   .calib-start-btn:hover { background: rgba(255,255,255,0.12) !important; }
 
-  /* ── Keyboard position diagram ── */
+  /* Keyboard position diagram */
   #kb-diagram {
     display: none;
     flex-direction: column;
@@ -424,7 +424,7 @@
     background: rgba(255,255,255,0.15);
     color: #eee; border-color: rgba(255,255,255,0.25);
   }
-  /* ── Chord mode ── */
+  /* Chord mode */
   #chord-welcome-screen { gap: 24px; max-width: 600px; }
   #chord-game-screen { gap: 16px; }
   #chord-results-screen { gap: 4px; max-width: 480px; }
@@ -653,9 +653,7 @@
 <script>
 'use strict';
 
-// ─────────────────────────────────────────────────────────────────────
 // Mode detection
-// ─────────────────────────────────────────────────────────────────────
 const _params = new URLSearchParams(window.location.search);
 const IS_COLLECT = _params.get('mode') === 'collect';
 const MANUAL_N = !IS_COLLECT && _params.has('n') ? Math.min(32, Math.max(3, parseInt(_params.get('n')) || 10)) : null;
@@ -665,9 +663,7 @@ const COLLECT_N_VALUES = [6, 10, 14, 18, 24, 30];
 const COLLECT_DURATION_S = 30;
 const COLLECT_REST_S = 5;
 
-// ─────────────────────────────────────────────────────────────────────
 // KeySubsetSelector — letters + special keys, center-outward priority
-// ─────────────────────────────────────────────────────────────────────
 const KeySubsetSelector = (() => {
   const PRIORITY = [
     'A','S','D','F','J','K','L',';',
@@ -710,9 +706,7 @@ const KeySubsetSelector = (() => {
   return { getKeySubset, getOptimalKeySubset, PRIORITY, LAYOUT_ORDER };
 })();
 
-// ─────────────────────────────────────────────────────────────────────
 // KeyNormalizer — letters + special keys
-// ─────────────────────────────────────────────────────────────────────
 const KeyNormalizer = {
   getKeyFromEvent(event) {
     if (event.code === 'Space' || event.key === ' ') return 'SPACE';
@@ -749,9 +743,7 @@ function spawnConfetti(count) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────
 // BitRateCalculator — Shenoy formula
-// ─────────────────────────────────────────────────────────────────────
 const BitRateCalculator = {
   compute(n, sc, si, tElapsedSeconds) {
     if (tElapsedSeconds < 0.001 || sc - si <= 0) return 0;
@@ -759,9 +751,7 @@ const BitRateCalculator = {
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────
 // InfoTheory — mutual information and channel capacity analysis
-// ─────────────────────────────────────────────────────────────────────
 const InfoTheory = (() => {
   // Compute mutual information I(X;Y) from trial data
   // X = targets, Y = responses
@@ -862,9 +852,7 @@ const InfoTheory = (() => {
   return { computeMI, throughputSummary };
 })();
 
-// ─────────────────────────────────────────────────────────────────────
 // TrialLogger
-// ─────────────────────────────────────────────────────────────────────
 class TrialLogger {
   constructor() { this.trials = []; }
   log(timestampMs, target, response, correct, rtMs) {
@@ -876,9 +864,7 @@ class TrialLogger {
   get length() { return this.trials.length; }
 }
 
-// ─────────────────────────────────────────────────────────────────────
 // DataExporter — copy to clipboard and download JSON
-// ─────────────────────────────────────────────────────────────────────
 const DataExporter = {
   copyJSON(jsonStr, button) {
     const done = () => {
@@ -919,9 +905,7 @@ const DataExporter = {
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────
 // AudioFeedback — Web Audio API tones
-// ─────────────────────────────────────────────────────────────────────
 const AudioFeedback = (() => {
   let audioCtx = null;
   let enabled = true;
@@ -1001,9 +985,7 @@ const AudioFeedback = (() => {
   };
 })();
 
-// ─────────────────────────────────────────────────────────────────────
 // ChordSymbols — 20 symbols: 8 singles + 6 left pairs + 6 right pairs
-// ─────────────────────────────────────────────────────────────────────
 const ChordSymbols = (() => {
   const LEFT = ['A','S','D','F'];
   const RIGHT = ['J','K','L',';'];
@@ -1042,9 +1024,7 @@ const ChordSymbols = (() => {
   return { symbols, LEFT, RIGHT, ALL_KEYS, getHand, findSymbol };
 })();
 
-// ─────────────────────────────────────────────────────────────────────
 // ChordDetector — resolves single keys (80ms timeout) or same-hand pairs
-// ─────────────────────────────────────────────────────────────────────
 const ChordDetector = (() => {
   let pending = null; // { key, hand, timestamp, timeout }
   let onResolved = null;
@@ -1118,9 +1098,7 @@ const ChordDetector = (() => {
   return { init, handleKeyDown, cleanup };
 })();
 
-// ─────────────────────────────────────────────────────────────────────
 // CalibrationFitter — OLS fitting + N* sweep
-// ─────────────────────────────────────────────────────────────────────
 const CalibrationFitter = (() => {
   function fit(rounds) {
     const xs = rounds.map(r => Math.log2(r.n));
@@ -1260,9 +1238,7 @@ const CalibrationFitter = (() => {
   return { fit, fitAccuracyBayes, predictBR };
 })();
 
-// ─────────────────────────────────────────────────────────────────────
 // ChartRenderer — inline SVG visualizations
-// ─────────────────────────────────────────────────────────────────────
 const ChartRenderer = (() => {
   const NS = 'http://www.w3.org/2000/svg';
   const M = { t: 10, r: 14, b: 26, l: 50 };
@@ -1321,7 +1297,7 @@ const ChartRenderer = (() => {
     textEl(svg, M.l - 6, M.t + 10, String(yMax), 'end');
   }
 
-  // ── Chart 1: Reaction Time over Trials ──
+  // Chart 1: Reaction Time over Trials
   function renderRTChart(container, trials) {
     if (trials.length === 0) return;
     const card = makeCard(container, 'Reaction Time');
@@ -1362,7 +1338,7 @@ const ChartRenderer = (() => {
     card.appendChild(svg);
   }
 
-  // ── Chart 2: Rolling Accuracy ──
+  // Chart 2: Rolling Accuracy
   function renderAccuracyChart(container, trials) {
     if (trials.length === 0) return;
     const card = makeCard(container, 'Rolling Accuracy (20-trial window)');
@@ -1405,7 +1381,7 @@ const ChartRenderer = (() => {
     card.appendChild(svg);
   }
 
-  // ── Chart 3: Bit Rate Over Time ──
+  // Chart 3: Bit Rate Over Time
   function renderBitRateChart(container, trials, n, gameStartMs, totalDurS) {
     if (trials.length === 0) return;
     const card = makeCard(container, 'Bit Rate Over Time');
@@ -1457,7 +1433,7 @@ const ChartRenderer = (() => {
     card.appendChild(svg);
   }
 
-  // ── Chart 4: Bit Rate vs N (collect mode) ──
+  // Chart 4: Bit Rate vs N (collect mode)
   function renderBitRateVsN(container, rounds) {
     if (rounds.length === 0) return;
     const card = makeCard(container, 'Bit Rate vs Alphabet Size');
@@ -1498,7 +1474,7 @@ const ChartRenderer = (() => {
     card.appendChild(svg);
   }
 
-  // ── Chart 5: Accuracy vs N (collect mode) ──
+  // Chart 5: Accuracy vs N (collect mode)
   function renderAccuracyVsN(container, rounds) {
     if (rounds.length === 0) return;
     const card = makeCard(container, 'Accuracy vs Alphabet Size');
@@ -1538,7 +1514,7 @@ const ChartRenderer = (() => {
     card.appendChild(svg);
   }
 
-  // ── Chart 6: Calibration predicted bit rate curve ──
+  // Chart 6: Calibration predicted bit rate curve
   function renderCalibChart(container, curve, calibRounds, recommendedN) {
     const card = makeCard(container, 'Predicted Bit Rate vs Alphabet Size');
     const W = 360, H = 180;
@@ -1576,7 +1552,7 @@ const ChartRenderer = (() => {
     card.appendChild(svg);
   }
 
-  // ── Confusion Matrix Heatmap ──
+  // Confusion Matrix Heatmap
   function renderConfusionMatrix(container, summary) {
     if (!summary || summary.total === 0) return;
 
@@ -1671,7 +1647,7 @@ const ChartRenderer = (() => {
     card.appendChild(svg);
   }
 
-  // ── Channel Throughput Comparison ──
+  // Channel Throughput Comparison
   function renderThroughputComparison(container, summary) {
     if (!summary) return;
 
@@ -1727,7 +1703,7 @@ const ChartRenderer = (() => {
     card.appendChild(svg);
   }
 
-  // ── Speed-Accuracy Operating Point ──
+  // Speed-Accuracy Operating Point
   function renderSpeedAccuracyDot(container, selectionsPerSec, accuracy, n, bitRate) {
     const card = makeCard(container, 'Speed-Accuracy Operating Point');
     const W = 300, H = 200;
@@ -1779,9 +1755,7 @@ const ChartRenderer = (() => {
 })();
 
 
-// ─────────────────────────────────────────────────────────────────────
-// KeyboardDiagram — miniature QWERTY position reference
-// ─────────────────────────────────────────────────────────────────────
+// KeyboardDiagram — mini QWERTY position reference
 const KeyboardDiagram = (() => {
   const ROWS = [
     ['Q','W','E','R','T','Y','U','I','O','P'],
@@ -1847,9 +1821,7 @@ const KeyboardDiagram = (() => {
   return { build, update, hide };
 })();
 
-// ─────────────────────────────────────────────────────────────────────
 // ErrorPatterns — render common error pairs
-// ─────────────────────────────────────────────────────────────────────
 function renderErrorPatterns(containerId, trials) {
   const container = document.getElementById(containerId);
   container.innerHTML = '';
@@ -1873,9 +1845,7 @@ function renderErrorPatterns(containerId, trials) {
   });
 }
 
-// ─────────────────────────────────────────────────────────────────────
 // GameState — full state machine
-// ─────────────────────────────────────────────────────────────────────
 const GAME_DURATION_S = 60;
 const N = 10;
 const QUEUE_LENGTH = 5;
@@ -1933,7 +1903,7 @@ const GameState = (() => {
   const countdownChar = document.getElementById('countdown-char');
   const participantInput = document.getElementById("name-input");
 
-  // ── Helpers ──
+  // Helpers
 
   function showScreen(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -2553,7 +2523,7 @@ const GameState = (() => {
     });
   }
 
-  // ── Chord mode helpers ──
+  // Chord mode helpers
 
   let chordQueue = [];
   const chordLogger = new TrialLogger();
@@ -2700,10 +2670,10 @@ const GameState = (() => {
     ChordDetector.handleKeyDown(event);
   }
 
-  // ── State definitions ──
+  // State definitions 
 
   const states = {
-    // ── Normal mode states ──
+    // Normal mode states 
     WELCOME: {
       enter() {
         showScreen('welcome-screen');
@@ -2759,7 +2729,7 @@ const GameState = (() => {
       update() {},
     },
 
-    // ── Calibration states (normal mode only) ──
+    // Calibration states (normal mode only)
     CALIBRATION_INTRO: {
       enter() {
         showScreen('calib-intro-screen');
@@ -3156,7 +3126,7 @@ const GameState = (() => {
       update() {},
     },
 
-    // ── Collect mode states ──
+    // Collect mode states
     PARTICIPANT_ID: {
       enter() {
         showScreen('participant-screen');
@@ -3274,7 +3244,7 @@ const GameState = (() => {
       update() {},
     },
 
-    // ── Chord mode states ──
+    // Chord mode states
     CHORD_WELCOME: {
       enter() {
         showScreen('chord-welcome-screen');
@@ -3406,7 +3376,7 @@ const GameState = (() => {
     },
   };
 
-  // ── Keydown handlers ──
+  // Keydown handlers
 
   function onWelcomeKey(e) {
     if (e.key === 'Enter') {
@@ -3476,7 +3446,7 @@ const GameState = (() => {
     updateMomentum();
   }
 
-  // ── State machine ──
+  // State machine
 
   function transition(newState) {
     if (currentState && states[currentState]) states[currentState].exit();
@@ -3503,9 +3473,7 @@ const GameState = (() => {
 })();
 
 
-// ─────────────────────────────────────────────────────────────────────
 // Boot
-// ─────────────────────────────────────────────────────────────────────
 GameState.start();
 </script>
 </body>
